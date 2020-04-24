@@ -1,0 +1,6 @@
+extlibs/*
+build/*
+docs/*
+xcode/*
+cmake-build-debug/*
+CMakeFiles/*
