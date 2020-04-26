@@ -23,9 +23,9 @@ public:
     Patch();                  //!< Patch constructor
     ~Patch(){};
 
-    static void setup_patches(std::shared_ptr<Model<dim>> modelPtr, json & configs, float downscale_factor);
+    static void setup_patches(std::shared_ptr<Model<dim>> modelPtr, settings_t  configs);
     static void run(unsigned const &iCount); 
-    static void visualize(const unsigned &, const json &);
+    static void visualize(const unsigned &, const settings_t &);
     static void update();
 
     static vector<shared_ptr<Patch<dim>>>& container(){static vector<shared_ptr<Patch<dim>>> var{}; return var;}
@@ -33,7 +33,7 @@ public:
     static shared_ptr<Patch<dim>>& find_an_empty_patch();
     static shared_ptr<Patch<dim>> find_an_empty_patch(shared_ptr<Patch<dim>>& refPatch);
     static std::shared_ptr<Model<dim>> get_modelPtr();              //!< Returns #_modelPtr
-    static json& configs(){ static json var{}; return var;};
+    static settings_t& configs(){ static settings_t var{}; return var;};
 
 
     void removeCell();        //!< Removes cell from patch
@@ -87,16 +87,17 @@ inline void Patch<dim>::run(unsigned const & iCount){
 }
 
 template<unsigned dim>
-inline void Patch<dim>::visualize(const unsigned &iCount,const json &specs){
-      if (specs["flag"] == false) return;
-      unsigned interval = specs["interval"];
+inline void Patch<dim>::visualize(const unsigned &iCount,const settings_t &specs){
+      bool patch_logs_flag = py::cast<bool>(specs["flag"]);
+      if (patch_logs_flag== false) return;
+      unsigned interval = py::cast<unsigned>(specs["interval"]);
       if (iCount != 0) {
         if (iCount % interval != 0) return;  // interval is not met
       }
-      string dir = specs["dir"];
+      string dir = py::cast<string>(specs["dir"]);
       ofstream O(dir);
       // header
-      vector<string> tags = specs["tags"];
+      vector<string> tags = specs["tags"].cast<vector<string>>();
       O<<"x,y";
       for (auto &tag:tags){
         O<<","<<tag;
@@ -139,13 +140,10 @@ inline Patch<dim>::Patch(){
 }
 template <unsigned dim>
 inline void Patch<dim>::initialize(){
-    for (auto &item:configs()["attrs"]) {
-        for (auto& el : item.items()) {
-          string name = el.key();
-          float value = el.value();
-          // cout<<name<<" "<<value<<endl;
+    for (auto key:configs()["patch"]["attrs"].attr("keys")()) {
+          string name =key.cast<string>();
+          float value =configs()["patch"]["attrs"][key].cast<float>();
           this->data.insert(std::pair<string,float>(name,value));
-        }
     }
 }
 template<unsigned dim>
@@ -184,12 +182,12 @@ inline shared_ptr<Cell<dim>> Patch<dim>::getCell(){
     return p;
 }
 template <unsigned dim>
-inline void Patch<dim>::setup_patches(std::shared_ptr<Model<dim>> modelPtr, json & configs_,float downscale_factor){
+inline void Patch<dim>::setup_patches(std::shared_ptr<Model<dim>> modelPtr, settings_t configs_){
     _modelPtr() = weak_ptr<Model<dim>>(modelPtr);
     configs() = configs_;
-    float x_l = configs()["x_l"]; x_l = x_l/downscale_factor;
-    float y_l = configs()["y_l"]; y_l = y_l/downscale_factor;
-    Mesh::setup_meshes(x_l,y_l, configs()["patch_size"]);
+    float x_l = configs()["domain"]["x_l"].cast<float>();
+    float y_l = configs()["domain"]["y_l"].cast<float>(); 
+    Mesh::setup_meshes(x_l,y_l, configs()["domain"]["patch_size"].cast<float>());
     /*** define patches on grids ***/
     for (int iter=0; iter<Mesh::meshes().size(); iter++)
     {

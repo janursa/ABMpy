@@ -21,30 +21,29 @@ using std::cout;
 #ifdef PYTHON
 struct CA{
     CA() {}
-    explicit CA(py::dict agent_modelObjs) {
-    	// add the controllers to controllers() in ctr by taging them based on cell type
+    explicit CA(py::dict agent_modelObjs,settings_t settings_) {
+    	// add the controllers to controllers() by taging them based on cell type
     	auto keys = agent_modelObjs.attr("keys")();
     	for (auto &key:keys) {
     		py::object agent_model = agent_modelObjs[key];
     		std::string agent_type = key.cast<string>();
-    		interface::agent_models().insert(std::pair<std::string,py::object>(agent_type,agent_model));
+    		Cell<DIM>::agent_models().insert(std::pair<std::string,py::object>(agent_type,agent_model));
     	}
+        settings = settings_;
     }
-    bool run(py::str settings_dir) {
-    	// setup the settings
-    	std::string dir = settings_dir.cast<std::string>();
-    	json settings = tools::file_to_json(dir);
+    bool run() {
     	tools::create_directory(main_output_folder);
-    	auto model = make_shared<Model<DIM>> (settings);
+        auto model = make_shared<Model<DIM>> (settings);
 		model->setup();
 		model->run();
         return true;
     }
+    settings_t settings;
 };
 
 PYBIND11_MODULE(CA, m) {
     py::class_<CA>(m, "CA")
-            .def(py::init<py::dict>()) //receives NN as input
+            .def(py::init<py::dict,settings_t>()) //receives NN as input
             .def("run", &CA::run);
 };
 

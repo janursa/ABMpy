@@ -3,6 +3,11 @@
 //
 // directives //*
 #pragma once
+#include <variant>
+#include <any>
+#include <string>
+#include <pybind11/pybind11.h>
+namespace py = pybind11;
 
 #define MIGRATION
 //#define AUTO_REMOVAL_DEADCELLS
@@ -21,8 +26,10 @@ const unsigned DIM = 2;
 #endif
 
 
-using input_t = std::map<std::string,std::map<std::string,std::vector<float>>>; //!< inputs of controllers
+using input_t = std::map<std::string,std::variant<bool,int,double,std::string>>; //!< inputs of controllers
+using settings_t = py::dict;
 using output_t = std::map<std::string,std::map<std::string,float>>;             //!< outputs of controllers
+
 //** types **/
 template <typename T>
 using matrix                             =  std::vector<std::vector<T>>;       //!< 2nd order vector containing T

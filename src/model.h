@@ -13,7 +13,6 @@
 #include <chrono>
 #include <thread>
 #include "settings.h"
-#include <pybind11/embed.h>
 #include <pybind11/stl.h>
 namespace py = pybind11;
 using json = nlohmann::json;
@@ -31,7 +30,7 @@ class Model:public enable_shared_from_this<Model<dim>>{
     friend class Cell<dim>;
     friend class Patch<dim>;
 public:
-    Model(json settings);             
+    Model(settings_t settings);             
     ~Model(){};
     bool setup();        
     void run();    
@@ -45,12 +44,12 @@ protected:
     unsigned start_passaging_n;
     unsigned passaging_count;
     unsigned duration_ticks;    //!< experiment duration
-    json settings;
+    settings_t settings;
 };
 template<unsigned dim>
-inline Model<dim>::Model(json settings_):
+inline Model<dim>::Model(settings_t settings_):
         iCount(0)
-{
+{     
     srand(time(0));
     settings = settings_;
    
@@ -88,15 +87,12 @@ inline bool Model<dim>::setup(){
         // this->passaging_count = 1;
         // if (settings["configs"]["end_passaging_n"] != nullptr) this->end_passaging_n = settings["configs"]["end_passaging_n"];
         // else this->end_passaging_n = this->start_passaging_n;
-        this->duration_ticks = settings["configs"]["exp_duration_days"];
+        this->duration_ticks = py::cast<unsigned>(settings["configs"]["exp_duration"]);
     };
-     INITIALIZE_VARIABLES();
-    Patch<dim>::setup_patches(this->shared_from_this(), settings["configs"]["patch"],settings["configs"]["downscale_factor"]);
-    Cell<dim>::setup_cells(this->shared_from_this(), settings["configs"]["agent"],settings["configs"]["downscale_factor"]);
-
-    // Cell<dim>::visualize(iCount,settings["configs"]()["agent"];
+    INITIALIZE_VARIABLES();
+    Patch<dim>::setup_patches(this->shared_from_this(), settings["configs"]);
+    Cell<dim>::setup_cells(this->shared_from_this(), settings["configs"]);
     _update();
-    
     return true;
 }
 
@@ -109,11 +105,15 @@ template<unsigned dim>
 inline void Model<dim>::run(){
     auto EXECUTE = [&](){
         visualize();
+        // cout<<"visualized"<<endl;
         Patch<dim>::run(iCount);
+        // cout<<"patch runned"<<endl;
         Cell<dim>::run(iCount);
+        // cout<<"cell runned"<<endl;
         Cell<dim>::update();
+        // cout<<"cell updated"<<endl;
         Patch<dim>::update();
-        // cout<<"_update\n";
+        // cout<<"patch updated"<<endl;
     };
     auto TIME_CONTROL = [&](){
         
@@ -137,6 +137,7 @@ inline void Model<dim>::run(){
         // this is the actual run
         iCount = 1;
         while (iCount <= duration_ticks){
+            cout<<"Iteration "<<std::to_string(iCount)<<endl;
             EXECUTE();
             iCount++;
         }
@@ -329,10 +330,11 @@ inline void Model<dim>::_update(){
 
 template<unsigned dim>
 inline void Model<dim>::visualize() const {
-    if (!settings["logs"]["flag"]) return; // no visualization
-    /***  cell distriburion visualization ***/
-    // std::chrono::seconds dura( 2);
-    // std::this_thread::sleep_for( dura );
+    bool logs_flag = py::cast<bool>(settings["logs"]["flag"]);
+    if (!logs_flag) return; // no visualization
+    // /***  cell distriburion visualization ***/
+    std::chrono::seconds dura( 2);
+    std::this_thread::sleep_for( dura );
     Cell<dim>::visualize(iCount,settings["logs"]["agent"]);
     Patch<dim>::visualize(iCount,settings["logs"]["patch"]);
 }
