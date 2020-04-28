@@ -1,22 +1,38 @@
-//
-// Created by nourisaj on 8/7/19.
-//
-// directives //*
+
 #pragma once
 #include <variant>
 #include <any>
 #include <string>
 #include <pybind11/pybind11.h>
-#include "cpp_logs.h"
 namespace py = pybind11;
 
 
 #define DEBUG
 
 
+#include <chrono>
+struct _clock {
+    void static start(){
+        _clock::_begin() = std::chrono::steady_clock::now();
+    }
+    void static end(){
+        _clock::_end() = std::chrono::steady_clock::now();
+        std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::seconds>(_end() - _begin()).count() << "[s]" << std::endl;
+    }
+    static std::chrono::steady_clock::time_point& _begin(){
+        static std::chrono::steady_clock::time_point var{};
+        return var;
+    };
+    static std::chrono::steady_clock::time_point& _end(){
+        static std::chrono::steady_clock::time_point var{};
+        return var;
+    };
+
+};
+
+
 
 // *** constants ***// 
-#define _unused(x) ((void)(x))
 const unsigned DIM = 2; 
 #ifdef DEBUG
 #define LOG(str) do { std::cout << str << std::endl; } while( false )
@@ -28,28 +44,10 @@ using domain_data_t = std::map<std::string,std::map<std::string,std::vector<floa
 using domain_measurements_scheme_t = std::vector<std::map<std::string,std::variant<std::string,std::vector<std::string>>>>;
 using settings_t = py::dict;
 
-//** types **/
-template <typename T>
-using matrix                             =  std::vector<std::vector<T>>;       //!< 2nd order vector containing T
-template <typename T>
-using matrix3                             =  std::vector<std::vector<std::vector<T>>>;       //!< 2nd order vector containing T
-
-
 //** directories **//
 
 const std::string root_dir = "/Users/matin/Downloads/testProjs/ABM/";
-const std::string settings_dir= root_dir + "settings.json";
-const std::string param_dir = root_dir+"parameters";
-const std::string scheme_dir = root_dir+ "schemes/scheme_helvia.json";
-
-
 const std::string main_output_folder = "outputs/";
-const std::string NN_output_folder = main_output_folder;
-const std::string cell_dist_file = main_output_folder + "cell_dist.csv";
-const std::string cell_count_file = main_output_folder + "cell_count.csv";
-const std::string cell_dist_output_folder = main_output_folder+"cell_dist/";           //!< dir of folder to write cell dist into
-const std::string cell_dist_output_file =  cell_dist_output_folder+ "cell_dist";
-
 
 struct invalid_directory{
     invalid_directory(std::string msg):message(msg){}

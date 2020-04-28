@@ -20,7 +20,7 @@
 using std::cout;
 struct CA{
     CA() {}
-    explicit CA(py::dict agent_modelObjs,settings_t settings_) {
+    explicit CA(py::dict agent_modelObjs,py::object patch_model,settings_t settings_) {
     	// add the controllers to controllers() by taging them based on cell type
     	auto keys = agent_modelObjs.attr("keys")();
     	for (auto &key:keys) {
@@ -28,13 +28,19 @@ struct CA{
     		std::string agent_type = key.cast<string>();
     		Cell<DIM>::agent_models().insert(std::pair<std::string,py::object>(agent_type,agent_model));
     	}
+
+        Patch<DIM>::patch_model() = patch_model;
+
         settings = settings_;
     }
     bool run() {
+        // 
+        _clock::start();
     	tools::create_directory(main_output_folder);
         auto model = make_shared<Model<DIM>> (settings);
 		model->setup();
 		model->run();
+        _clock::end();
         return true;
     }
     settings_t settings;
@@ -42,7 +48,7 @@ struct CA{
 
 PYBIND11_MODULE(CA, m) {
     py::class_<CA>(m, "CA")
-            .def(py::init<py::dict,settings_t>()) //receives NN as input
+            .def(py::init<py::dict,py::object,settings_t>()) //receives NN as input
             .def("run", &CA::run);
 };
 

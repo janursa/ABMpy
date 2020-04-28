@@ -42,6 +42,7 @@ public:
     static void initialize_attributes(shared_ptr<Cell<dim>> &agent);
     static std::map<string,py::object> & agent_models() { static std::map<string,py::object> var{}; return var;};
 
+    bool has_patch = false;
 
     void setPatch(shared_ptr<Patch<dim>> pPtr);         //!< Sets _patchPtr
     shared_ptr<Patch<dim>> getPatch();                  //!< Returns _patchPtr
@@ -170,7 +171,7 @@ inline const void Cell<dim>::visualize(const unsigned &iCount,const settings_t &
             unsigned ii =0;
             for (auto &tag: tags){
                 if (Model<dim>::data()["agent"].find(tag) == Model<dim>::data()["agent"].end()){
-                    std::cerr<<RED<<"Error: "<<RESET<<" requested tag '"<<RED<<tag<<RESET<<"' for agent log is not defined in the domain variables."<<endl;
+                    std::cerr<<RED<<"Error: "<<RESET<<" the tag '"<<RED<<tag<<RESET<<"' requested for agent log but missing in the domain variables."<<endl;
                     std::terminate();
                 }
                 else{
@@ -253,6 +254,7 @@ inline void Cell<dim>::update() {
             // cout<<"switching"<<endl;
             shared_ptr<Patch<dim>> host_patch = cell->getPatch();
             string new_type = cell->switch_info.second;
+            host_patch->removeCell();
             auto new_cell = Cell<dim>::hatch_a_cell(host_patch,new_type);
             auto pos = distance(container().begin(), find(container().begin(), container().end(), cell));
             container()[pos] = new_cell;
@@ -296,20 +298,7 @@ inline void Cell<dim>::update() {
         }
     }
     
-    auto CHOOSE_A_PATCH_TO_MOVE = [&](shared_ptr<Cell<dim>> & cell){
-        auto patch = cell->getPatch();
-        auto neighborPatches = patch->neighborPatches;
-        vector<int> available_patches_indices;
-        for (unsigned i=0; i < neighborPatches.size(); i++){
-            if (neighborPatches[i]->hasCell()) continue;
-            available_patches_indices.push_back(i);
-        }
-        if (available_patches_indices.size() == 0) throw no_available_patch();
-        else {
-            unsigned chosen_index = tools::create_random_value(0,available_patches_indices.size());
-            return neighborPatches[chosen_index];
-        }
-    };
+    
     
     for (unsigned iter = 0; iter < Cell<dim>::container().size(); iter++){
         // cout<<iter<<" out of "<<Cell<dim>::container().size()<<endl;
@@ -317,7 +306,8 @@ inline void Cell<dim>::update() {
         if (cell->walk_flag == false) continue;
         // cout<<"M 1"<<endl;
         shared_ptr<Patch<dim>> destination;
-        try {destination = CHOOSE_A_PATCH_TO_MOVE(cell);}
+        shared_ptr<Patch<dim>> ref_patch = cell->getPatch();
+        try {destination = Patch<dim>::find_an_empty_patch(ref_patch);}
         catch (no_available_patch & err) {
             continue;
         } 
@@ -358,6 +348,7 @@ inline void Cell<dim>::setPatch(shared_ptr<Patch<dim>> pPtr){
     }
     try{
         this->_patchPtr  = weak_ptr<Patch<dim>>(pPtr);
+        this->has_patch = true;
     } catch(...){
         std::cerr<<"couldn't convert to shared ptr in set patch inside cell class"<<endl;
 
@@ -496,13 +487,8 @@ inline void Cell<dim>::receive_agent_outputs(){
 }
 template <unsigned dim>
 inline void Cell<dim>::function(){
-    // cout<<"inside function"<<endl;
-    // if (this->die_flag == true) return;
     this->update_agent_inputs();
-    // cout<<"agnet input updated"<<endl;
     this->receive_agent_outputs();
-    // cout<<"agnet outputs received"<<endl;
-    
 }
     
 

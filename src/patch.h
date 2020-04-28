@@ -16,7 +16,7 @@ class Cell;
   A more elaborate class description.
 */
 template<unsigned dim>
-class Patch {
+class Patch:public enable_shared_from_this<Patch<dim>> {
 public:
 
 
@@ -34,7 +34,11 @@ public:
     static shared_ptr<Patch<dim>> find_an_empty_patch(shared_ptr<Patch<dim>>& refPatch);
     static std::shared_ptr<Model<dim>> get_modelPtr();              //!< Returns #_modelPtr
     static settings_t& configs(){ static settings_t var{}; return var;};
-
+    static py::object & patch_model(){static py::object var{}; return var;}
+    
+    void update_patch_inputs();
+    void receive_patch_outputs();
+    void function();
 
     void removeCell();        //!< Removes cell from patch
     void initialize();             //!< initialize patch variables
@@ -46,6 +50,7 @@ public:
     vector<float> xyzcoords; 
     unsigned patchIndex;
 
+
 private:
     static weak_ptr<Model<dim>>& _modelPtr(){static  weak_ptr<Model<dim>> var{}; return var;};
     weak_ptr<Cell<dim>> _cellPtr;
@@ -55,7 +60,7 @@ private:
 template<unsigned dim>
 inline shared_ptr<Patch<dim>> Patch<dim>::find_an_empty_patch(shared_ptr<Patch<dim>>& refPatch){
     auto neighborPatches = refPatch->neighborPatches;
-    refPatch.reset(); //pointer to refPatch is no longer needed
+    // refPatch.reset(); //pointer to refPatch is no longer needed
     vector<shared_ptr<Patch<dim>>> free_patch_container; //available neighbor patches will be stored here
     for (auto neighborPatch:neighborPatches){
         if (!neighborPatch->hasCell()) free_patch_container.push_back(neighborPatch);
@@ -72,15 +77,16 @@ inline shared_ptr<Patch<dim>> Patch<dim>::find_an_empty_patch(shared_ptr<Patch<d
 
 template<unsigned dim>
 inline void Patch<dim>::run(unsigned const & iCount){
-    // for (auto &patch:Patch<dim>::container()) patch->function();
+
+    for (auto &patch:Patch<dim>::container()) patch->function();
 
     // medium change
-    auto MEDIUM_CHANGE = [&]() {
-        LOG("changing medium");
-        for (auto &patch : Patch<dim>::container()) {
-            patch->initialize();
-        }
-    };
+    // auto MEDIUM_CHANGE = [&]() {
+    //     LOG("changing medium");
+    //     for (auto &patch : Patch<dim>::container()) {
+    //         patch->initialize();
+    //     }
+    // };
     // if ((iCount%(int)inputs::params()["medium_change_interval"])!=0) return;
     // else MEDIUM_CHANGE();
 
@@ -198,13 +204,24 @@ inline void Patch<dim>::initialize(){
     }
 }
 template<unsigned dim>
-inline void Patch<dim>::setCell(shared_ptr<Cell<dim>> cellPtr){
-    _cellPtr=weak_ptr<Cell<dim>>(cellPtr);
+inline void Patch<dim>::setCell(shared_ptr<Cell<dim>> pPtr){
+    if (!pPtr) {
+        std:cerr<<"Cell pointer is null"<<endl;
+        std::terminate();
+    }
+    try{
+        this->_cellPtr  = weak_ptr<Cell<dim>>(pPtr);
+    } catch(...){
+        std::cerr<<"couldn't convert to shared ptr in set cell"<<endl;
+
+    }
+
     _hasCell = true;
 }
 template <unsigned dim>
 void Patch<dim>::removeCell(){
     _hasCell = false;
+    this->_cellPtr.reset();
 }
 template<unsigned dim>
 inline void Patch<dim>::update(){
@@ -262,10 +279,9 @@ inline void Patch<dim>::setup_patches(std::shared_ptr<Model<dim>> modelPtr, sett
             patch->neighborPatches.push_back(neighborPatch);
         }
     }
-
 }
 template<unsigned dim>
-inline std::shared_ptr<Model<dim>>  Patch<dim>::get_modelPtr(){
+inline std::shared_ptr<Model<dim>> Patch<dim>::get_modelPtr(){
     shared_ptr<Model<dim>> p = _modelPtr().lock();
     if (!p){
         throw logic_error("Weak_ptr (_modelPtr inside patch) expired)");
@@ -277,4 +293,89 @@ template<unsigned dim>
 inline bool Patch<dim>::hasCell() const{
     return _hasCell;
 }
+
+
+template <unsigned dim>
+inline void Patch<dim>::update_patch_inputs(){
+    auto main_tags = patch_model().attr("inputs").attr("keys")();
+    // for self inputs
+    auto EXTRACT_SELF_INPUTS = [&](){
+        for (auto tag_:patch_model().attr("inputs")["self"].attr("keys")()){ // collecting inputs from self
+            float value;
+            auto tag = py::cast<string>(tag_);
+            try {value = this->data.at(tag);}
+            catch (out_of_range & er) {
+                cerr<<"The input '"<<tag<<"' for patch [self] is not defined but requested as input"<<endl;
+                std::terminate();
+            } 
+            patch_model().attr("inputs")["self"][tag_] = value;
+        }
+    };
+    // for patch inputs
+    auto EXTRACT_AGENT_INPUTS = [&](){
+        shared_ptr<Cell<dim>> agent;
+        try{ agent =  this->getCell();}
+        catch(logic_error &er){return;}
+        for (auto &tag_:patch_model().attr("inputs")["agent"].attr("keys")()){ // collecting inputs from patch
+            float value;
+            auto tag = py::cast<string>(tag_);
+            try {value =agent->data.at(tag);}
+            catch (out_of_range & er) {
+                cerr<<"The input key '"<<tag<<"' for patch [agent] is not defined in agent attributes "<<endl;
+                std::terminate();
+            } 
+            
+            vector<float> values {value};
+            patch_model().attr("inputs")["agent"][tag_] = value ;
+        }
+    };
+    for (auto &tag_:main_tags){
+        string tag = py::cast<string>(tag_);
+        if (tag == "self") EXTRACT_SELF_INPUTS();
+        else if (tag == "agent") EXTRACT_AGENT_INPUTS();
+        else {
+            cerr<<"Error: output key '"<<tag<<"' is neither self or agent. Correct the input formating for patch inputs. "<<endl;
+            std::terminate();
+        }
+    }
+    
+   
+}
+template <unsigned dim>
+inline void Patch<dim>::receive_patch_outputs(){
+    patch_model().attr("forward")();  // updates the outputs in python file
+    // output_t outputs; 
+    auto main_tags = patch_model().attr("outputs").attr("keys")();
+    auto RECEIVE_SELF_OUTPUTS = [&](py::dict sub_output){
+        for (const auto event_key_:sub_output.attr("keys")()){
+                auto event_key = py::cast<string>(event_key_);
+                this->data[event_key] = py::cast<float>(sub_output[event_key_]);
+                
+            }
+    };
+    auto RECEIVE_AGENT_OUTPUTS = [&](py::dict sub_output){
+        for (const auto event_key_:sub_output.attr("keys")()){
+                auto event_key = py::cast<string>(event_key_);
+                try {this->getCell()->data[event_key] = py::cast<float>(sub_output[event_key_]);}
+                catch(logic_error&er) {continue;};
+            }
+        };
+    for (auto &tag_:main_tags){
+        string tag = py::cast<string>(tag_);
+        auto sub_output = patch_model().attr("outputs")[tag_];
+        if (tag == "self") RECEIVE_SELF_OUTPUTS(sub_output);
+        else if (tag == "patch") RECEIVE_AGENT_OUTPUTS(sub_output);
+        else {
+            cerr<<"Error: output key '"<<tag<<"' is neither self or agent. Correct the output formating for patch. "<<endl;
+            std::terminate();
+        }
+    }
+    
+}
+template <unsigned dim>
+inline void Patch<dim>::function(){
+    this->update_patch_inputs();
+    this->receive_patch_outputs();    
+}
+
 

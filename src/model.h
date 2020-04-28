@@ -9,13 +9,11 @@
 
 #include "patch.h"
 #include "agent.h"
-#include <nlohmann/json.hpp>
 #include <chrono>
 #include <thread>
 #include "settings.h"
 #include <pybind11/stl.h>
 namespace py = pybind11;
-using json = nlohmann::json;
 template <unsigned dim>
 class Cell;
 template <unsigned dim>
@@ -54,6 +52,9 @@ protected:
     unsigned duration_ticks;    //!< experiment duration
     settings_t settings;
     domain_measurements_scheme_t measurements_scheme; //! the scheme for obtaining #data
+    static bool& saturation_flag(){
+        static bool var{}; return var;
+    };
 };
 template<unsigned dim>
 inline Model<dim>::Model(settings_t settings_):
@@ -133,6 +134,11 @@ inline bool Model<dim>::setup(){
 template<unsigned dim>
 inline void Model<dim>::run(){
     auto EXECUTE = [&](){
+        if (Patch<dim>::container().size() < Cell<dim>::container().size()){
+            cout<<"got it"<<endl;
+            saturation_flag() = true;
+        }
+
         this->append_flag = true;
         visualize();
         // cout<<"visualized"<<endl;
@@ -167,15 +173,27 @@ inline void Model<dim>::run(){
         // }
         // this is the actual run
         iCount = 1;
-        while (iCount <= duration_ticks){
-            cout<<"Iteration "<<std::to_string(iCount)<<endl;
+        while (iCount < duration_ticks) {
+            int barWidth = 70;
+            std::cout << "[";
+            int pos = barWidth * (float)iCount/duration_ticks;
+            for (int i = 0; i < barWidth; ++i) {
+                if (i < pos) std::cout << "=";
+                else if (i == pos) std::cout << ">";
+                else std::cout << " ";
+            }
+            std::cout << "] " << iCount << " Iterations\r";
+            std::cout.flush();
+
             EXECUTE();
             iCount++;
         }
+        std::cout<<endl;
 
     };
     TIME_CONTROL();
     // return results_repos;
+    cout<<"Run completed"<<endl;
 
 }
 
@@ -309,8 +327,6 @@ inline void Model<dim>::_update(){
         }        
     };
     UPDATE_DOMAIN_DATA();
-    json jj(this->data());
-    cout<<setw(4)<<jj<<endl;
     this->append_flag = false;
 
 }
@@ -322,8 +338,8 @@ inline void Model<dim>::visualize() const {
     bool logs_flag = py::cast<bool>(settings["logs"]["flag"]);
     if (!logs_flag) return; // no visualization
     // /***  cell distriburion visualization ***/
-    std::chrono::seconds dura( 2);
-    std::this_thread::sleep_for( dura );
+    // std::chrono::seconds dura( 2);
+    // std::this_thread::sleep_for( dura );
     Cell<dim>::visualize(iCount,settings["logs"]);
     Patch<dim>::visualize(iCount,settings["logs"]);
 }
