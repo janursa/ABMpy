@@ -79,9 +79,24 @@ namespace tools{
     float calculate_percentage_total_sum_of_squares(vector<int> &lower_bound_indices,vector<float>& results_array); //!< calculates percentafe of total sum of squares for each parameter 
     void params_to_file(map<string,float> &data,string &file_name, bool beauty); //!< Receivs a parameters type and writes it to the given file
     map<string,float> file_to_params(const string &file_name); //!< receivs a file dir, process it and converts it to ABM parameters inputs
-    void log_map(map<string,float> &data);  
     void json_to_file(json & jj, string file_name); //!< Receives a data in json format and writes it to the given file dir
     json file_to_json(string file_name);        //!< Recives a file dir, reads it and converts it to json format
+
+    template<typename Key, typename Value>
+    std::ostream& operator<<(std::ostream& os, const std::pair<const Key, Value>& p)
+    {
+        os << p.first << " => " << p.second;
+        return os;
+    }
+
+    template<typename Container>
+    void log_map(int level, const Container& c) {
+        if (level >= 0) {
+            for(typename Container::const_iterator it = c.begin();
+                it != c.end(); ++it)
+            std::cout << *it << '\n';
+        }
+    }
 }
 
 // inline void tools::remove_directory(string dir){
@@ -115,10 +130,7 @@ inline json tools::file_to_json(string file_name){
     i.close();
     return jj;
 }
-inline void tools::log_map(map<string,float> &data){
-    json jj(data);
-    cout<<setw(4)<<jj<<endl;
-}
+
 inline map<string,float> tools::file_to_params(const string &file_name){
 
 

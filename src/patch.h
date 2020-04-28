@@ -88,37 +88,88 @@ inline void Patch<dim>::run(unsigned const & iCount){
 
 template<unsigned dim>
 inline void Patch<dim>::visualize(const unsigned &iCount,const settings_t &specs){
-      bool patch_logs_flag = py::cast<bool>(specs["flag"]);
-      if (patch_logs_flag== false) return;
-      unsigned interval = py::cast<unsigned>(specs["interval"]);
-      if (iCount != 0) {
-        if (iCount % interval != 0) return;  // interval is not met
-      }
-      string dir = py::cast<string>(specs["dir"]);
-      ofstream O(dir);
-      // header
-      vector<string> tags = specs["tags"].cast<vector<string>>();
-      O<<"x,y";
-      for (auto &tag:tags){
-        O<<","<<tag;
-      }
-      O<<"\n";        
-      for (auto &patch:container()){ 
-        float x = patch->xyzcoords[0];
-        float y = patch->xyzcoords[1];
-        O<<x<<","<<y;
+    auto DENSITYMAP_LOG = [&](auto &item){
+        string dir = py::cast<string>(item["dir"]);
+        ofstream O(dir);
+        // header
+        vector<string> tags = py::cast<vector<string>>(item["tags"]);
+        O<<"x,y";
         for (auto &tag:tags){
-            float value;
-            try {value = patch->data.at(tag);}
-            catch(out_of_range &er){
-                cerr<<"Error: '"<<tag<<"' requested for visualization is not defined in patch attributes"<<endl;
-                std::terminate();
-            }
-            O<<","<<value;
-          }
+            O<<","<<tag;
+        }
+        O<<"\n";        
+        for (auto &patch:container()){ 
+            float x = patch->xyzcoords[0];
+            float y = patch->xyzcoords[1];
+            O<<x<<","<<y;
+            for (auto &tag:tags){
+                float value;
+                try {value = patch->data.at(tag);}
+                catch(out_of_range &er){
+                    cerr<<"Error: '"<<tag<<"' requested for visualization is not defined in patch attributes"<<endl;
+                    std::terminate();
+                }
+                O<<","<<value;
+              }
+            O<<"\n";
+        }
+        O.close();
+    };
+    auto TRAJ_LOG = [&](auto &item){
+        string dir = py::cast<string>(item["dir"]);
+        ofstream O(dir);
+        vector<string> tags = py::cast<vector<string>>(item["tags"]);
+        //header
+        unsigned ii = 0;
+        for (auto &tag:tags){
+            if (ii == 0) O<<tag;
+            else O<<","<<tag;
+            ii ++;
+        }
         O<<"\n";
-      }
-      O.close();
+
+        for (unsigned iter =0; iter != iCount; iter++){
+            unsigned ii =0;
+            for (auto &tag: tags){
+                if (Model<dim>::data()["patch"].find(tag) == Model<dim>::data()["patch"].end()){
+                    std::cerr<<RED<<"Error: "<<RESET<<" requested tag '"<<RED<<tag<<RESET<<"' for patch log is not defined in the domain variables."<<endl;
+                    std::terminate();
+                }
+                else{
+                    auto value = Model<dim>::data()["patch"][tag][iter];
+                    if (ii == 0) O << value;
+                    else O<<","<<value;
+                    ii++;
+                }
+                
+            }
+            O<<"\n"; 
+        }
+        
+
+        O.close();
+    };
+
+    for (auto &item:specs["patch"]){
+        bool item_logs_flag = py::cast<bool>(item["flag"]);
+        if (item_logs_flag == false) continue;
+        unsigned interval = py::cast<unsigned>(item["interval"]);
+        if (iCount != 0) {
+            if ( iCount % interval != 0) continue;  // interval is not met
+        }
+        string type = py::cast<string>(item["type"]);
+        if (type == "densitymap"){
+            DENSITYMAP_LOG(item);
+        }
+        else if (type == "traj"){
+            TRAJ_LOG(item);
+        }
+        else {
+            std::cerr<<RED<<"Error: "<<RESET<<" type of log entered as '"<<RED<<type<<RESET<<"' is not acceptable."<<endl;
+            std::terminate();
+        }
+    }
+      
 
 }
 template<unsigned dim>

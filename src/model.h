@@ -35,8 +35,16 @@ public:
     bool setup();        
     void run();    
     void  visualize() const; //!< To log requrested outputs for visualization
-protected:
 
+    static std::map<std::string,std::vector<unsigned>>& agent_counts(){
+        static std::map<std::string,std::vector<unsigned>> var{}; return var;
+    };
+    static domain_data_t& data(){
+        static domain_data_t var{}; return var;
+    }; // trajectory of domain results taged based on patch, self, etc.
+
+protected:
+    bool append_flag=false;
     void _update();
     void _passaging(); 
     unsigned iCount;            //!< Iteration index of the simulation incremented in #run.
@@ -45,6 +53,7 @@ protected:
     unsigned passaging_count;
     unsigned duration_ticks;    //!< experiment duration
     settings_t settings;
+    domain_measurements_scheme_t measurements_scheme; //! the scheme for obtaining #data
 };
 template<unsigned dim>
 inline Model<dim>::Model(settings_t settings_):
@@ -88,11 +97,31 @@ inline bool Model<dim>::setup(){
         // if (settings["configs"]["end_passaging_n"] != nullptr) this->end_passaging_n = settings["configs"]["end_passaging_n"];
         // else this->end_passaging_n = this->start_passaging_n;
         this->duration_ticks = py::cast<unsigned>(settings["configs"]["exp_duration"]);
+
+        auto PROCESS_DOMAIN_MEASUREMENTS_SCHEME = [&](){
+            auto measurements = settings["configs"]["domain"]["measurements"];
+            map<string,variant<string,vector<string>>> m_item;
+            for (auto &m_item_:measurements){
+                m_item.clear();
+                for (auto &tag_:m_item_.attr("keys")()){
+                    string tag = py::cast<string>(tag_);
+                    if (tag == "on" or tag == "mode") m_item[tag] = py::cast<string>(m_item_[tag_]);
+                    else if (tag == "tags") m_item[tag] = py::cast<vector<string>>(m_item_[tag_]);
+                    else {
+                        std::cerr<<RED<<"Error: "<<RESET<<" input name '"<<RED<<tag<<RESET<<"' is not acceptable for domain measurements inputs."<<endl;
+                        std::terminate();
+                    }
+                }
+                this->measurements_scheme.push_back(m_item);
+            }
+        };
+        PROCESS_DOMAIN_MEASUREMENTS_SCHEME();   
     };
     INITIALIZE_VARIABLES();
     Patch<dim>::setup_patches(this->shared_from_this(), settings["configs"]);
     Cell<dim>::setup_cells(this->shared_from_this(), settings["configs"]);
-    _update();
+    this->append_flag = true;
+    this->_update();
     return true;
 }
 
@@ -104,6 +133,7 @@ inline bool Model<dim>::setup(){
 template<unsigned dim>
 inline void Model<dim>::run(){
     auto EXECUTE = [&](){
+        this->append_flag = true;
         visualize();
         // cout<<"visualized"<<endl;
         Patch<dim>::run(iCount);
@@ -114,6 +144,7 @@ inline void Model<dim>::run(){
         // cout<<"cell updated"<<endl;
         Patch<dim>::update();
         // cout<<"patch updated"<<endl;
+        _update();
     };
     auto TIME_CONTROL = [&](){
         
@@ -204,125 +235,83 @@ inline void Model<dim>::_passaging() {
 
 template<unsigned dim>
 inline void Model<dim>::_update(){
-    Cell<dim>::update();
+    auto UPDATE_AGENT_COUNT = [&](){
+        map<string,unsigned> agent_counts_single;
+        for (unsigned i = 0; i < Cell<dim>::container().size(); i++) {
+            auto cell =  Cell<dim>::container()[i];
+            agent_counts_single[cell->c_type]++;
+        }
+        for (auto &agent_model:Cell<dim>::agent_models()){
+            auto agent_tag = agent_model.first;
+            if (agent_counts_single.find(agent_tag) == agent_counts_single.end()){ // this agent doesnt have any record in container
+                agent_counts_single[agent_tag] = 0;
+            }
+        }
+        for (auto &item:agent_counts_single){
+            auto tag = item.first;
+            auto value = item.second;
+            if (this->agent_counts().find(tag) == this->agent_counts().end()){
+                this->agent_counts()[tag] = vector<unsigned>();
+            }
+            if (this->append_flag == true) this->agent_counts()[tag].push_back(value);
+            else this->agent_counts()[tag].back() = value;
+        }
+    };
+    UPDATE_AGENT_COUNT();
 
-    // create a result object for this episode
-    // auto results = make_shared<Result>();
-    // for (auto &cell:Cell<dim>::container()){
-    //     results->agents_count[cell->c_type] ++; // if the tag is there, it increaments it. if not, it creates it and increaments it
-    // }
-
-    // // extract the accumulated values of the factors entered as patch attributes
-    // for (auto &key:Patch<dim>::attr_tags()){
-    //     float sum = 0;
-    //     for (auto &patch:Patch<dim>::container()){
-    //         float value = patch->attributes[key];
-    //         sum += value;
-    //     }
-    //     results->data[key] = sum;
-    // }
-    // _cellTotalCount = Cell<dim>::container().size();
-
-    // results_repos[iCount] = results;
-
-    // json jj(results_repos);
-    // cout<<jj<<endl;
-
-
-    // if (iCount == results_repos.size()-1 
-
-    // auto results = make_shared<Result>();
-
-//     auto UPDATE = [&](){
-//         LOG("---updating---");
-        
-//         /// update cell count for each cell type
-//         for (auto cell:Cell<dim>::container()){
-//             _results->cell_count[cell->c_type][iCount]++;
-//         }
-
-//         /// update over cell count
-//         int sum = 0;
-//         for (int celltype_i=0; celltype_i < enums::CELL_TYPE_COUNT; celltype_i++){
-//             vector<int> value_list;
-//             try {
-//                 value_list = _results->cell_count[celltype_i];
-//             }catch(...){
-//                 cerr<<"Error: cell type "<<celltype_i<<" causes error in update"<<endl;
-//                 exit(2);
-//             }
-//             int value;
-//             try {
-//                 value = value_list[iCount];
-//             }catch(...){
-//                 cerr<<"Error: iCount "<<iCount<<" cases error in update"<<endl;
-//                 exit(2);
-//             }
-//             sum += value;
-//         }
-//         _cellTotalCount = sum;
-//         // cout<<" update sum "<<sum<<endl;
-
-//         auto _deadCellTotalCount = _results->cell_count[enums::deadcell_t][iCount];
-//         auto _aliveCellCount = _cellTotalCount - _deadCellTotalCount;
-//         _results->_quantities_int[enums::liveCellCount_q][iCount] = _aliveCellCount;
-//         // cout<<"update: "<<"total "<<_cellTotalCount<<" alive "<<_aliveCellCount<<" dead "<<_deadCellTotalCount<<endl;
-//         _results->_quantities_float[enums::viability_q][iCount] = (float)_aliveCellCount/_cellTotalCount;
-
-//     };
-//     auto APPEND = [&](){
-// //        cout<<"---appending---"<<endl;
-//         vector<int> counts(enums::CELL_TYPE_COUNT);
-//         for (auto cell:Cell<dim>::container()){
-//             counts[cell->c_type]++;
-//         }
-//         for (unsigned celltype_i=0; celltype_i<enums::CELL_TYPE_COUNT; celltype_i++){
-//             _results->cell_count[celltype_i].push_back(counts[celltype_i]);
-//         }
-//         /// update over cell count
-//         int sum = 0;
-//         for (int celltype=0; celltype < enums::CELL_TYPE_COUNT; celltype++){
-//             // if (celltype == enums::deadcell_t) continue;
-//             sum += _results->cell_count[celltype][iCount];
-//         }
-//         // cout<<"append sum "<<sum<<endl;
-//         _cellTotalCount = sum;
-//         _results->_quantities_int[enums::liveCellCount_q].push_back(sum);
-//         auto _deadCellTotalCount = _results->cell_count[enums::deadcell_t][iCount];
-//         auto _aliveCellCount = _cellTotalCount - _deadCellTotalCount;
-//         // cout<<"append: "<<"total "<<_cellTotalCount<<" alive "<<_aliveCellCount<<" dead "<<_deadCellTotalCount<<endl;
-//         _results->_quantities_float[enums::viability_q].push_back((float)_aliveCellCount/_cellTotalCount);
-//         append_flag = false;
-
-//     };
-//     try{
-
-//         if (append_flag) APPEND();
-//         else UPDATE();
-//     }catch(...){
-//         cerr<<"_update_cellCount is the shitty problem"<<endl;
-//         exit(2);
-//     }
-
-
-
- // float sum_ph = 0;
- //    float sum_ECM = 0;
- //    float sum_mineral = 0;
-
- //    for (auto patch:Patch<dim>::container()) {
- //        sum_ph+=patch->get_ph();
- //        sum_ECM+=patch->get_ECM();
- //        sum_mineral+=patch->get_mineral();
- //    }
- //    float mean_ph = sum_ph / _patchCount;
- //    float mean_ECM = sum_ECM / _patchCount; //!< mean ECM on patch
- //    float mean_mineral = sum_mineral / _patchCount; //!< mean mineral on patch
- //    _results->_quantities_float[enums::mean_ph_q].push_back(mean_ph);
-
-// _confluence = 20; 
-    // _confluence = (float)(_cellTotalCount)/_patchCount;
-//    cout<<"*********** confluence "<<_confluence<<endl;
+    auto UPDATE_DOMAIN_DATA = [&](){
+        auto UPDATE_DOMAIN_PATCH_DATA = [&](auto &m_item){
+            auto tags = std::get<vector<string>>(m_item["tags"]);
+            auto mode = std::get<string>(m_item["mode"]);
+            for (const auto &tag:tags){
+                float sum = 0;
+                for (auto &patch:Patch<dim>::container()){
+                    sum+=patch->data[tag];
+                }
+                float result = 0;
+                if (mode == "sum") result = sum;
+                else if (mode == "mean") result = sum/Patch<dim>::container().size();
+                else {
+                    std::cerr<<RED<<"Error: "<<RESET<<" mode entered as '"<<RED<<mode<<RESET<<"' is not acceptable."<<endl;
+                    std::terminate();
+                }
+                if (this->append_flag == true) this->data()["patch"][tag].push_back(result);
+                else this->data()["patch"][tag].back() = result;
+            }      
+        };
+        auto UPDATE_DOMAIN_AGENT_DATA = [&](auto &m_item){
+            auto tags = std::get<vector<string>>(m_item["tags"]);
+            auto mode = std::get<string>(m_item["mode"]);
+            for (const auto &tag:tags){
+                float sum = 0;
+                for (auto &agent:Cell<dim>::container()){
+                    sum+=agent->data[tag];
+                }
+                float result = 0;
+                if (mode == "sum") result = sum;
+                else if (mode == "mean") result = sum/Cell<dim>::container().size();
+                else {
+                    std::cerr<<RED<<"Error: "<<RESET<<" mode entered as '"<<RED<<mode<<RESET<<"' is not acceptable."<<endl;
+                    std::terminate();
+                }
+                if (this->append_flag == true) this->data()["agent"][tag].push_back(result);
+                else this->data()["agent"][tag].back() = result;
+            }      
+        };
+        for ( auto& m_item: this->measurements_scheme){
+            auto on = std::get<string>(m_item["on"]);
+            if (on == "patch") UPDATE_DOMAIN_PATCH_DATA(m_item);
+            else if (on == "agent") UPDATE_DOMAIN_AGENT_DATA(m_item);
+            else {
+                std::cerr<<RED<<"Error: "<<RESET<<" the entered '"<<RED<<on<<RESET<<"' as domain measurements on is neither patch or agent."<<endl;
+                std::terminate();
+            }
+        }        
+    };
+    UPDATE_DOMAIN_DATA();
+    json jj(this->data());
+    cout<<setw(4)<<jj<<endl;
+    this->append_flag = false;
 
 }
 
@@ -335,8 +324,8 @@ inline void Model<dim>::visualize() const {
     // /***  cell distriburion visualization ***/
     std::chrono::seconds dura( 2);
     std::this_thread::sleep_for( dura );
-    Cell<dim>::visualize(iCount,settings["logs"]["agent"]);
-    Patch<dim>::visualize(iCount,settings["logs"]["patch"]);
+    Cell<dim>::visualize(iCount,settings["logs"]);
+    Patch<dim>::visualize(iCount,settings["logs"]);
 }
 
 

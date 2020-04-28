@@ -18,7 +18,6 @@
 #include <iostream>
 #include "model.h"
 using std::cout;
-#ifdef PYTHON
 struct CA{
     CA() {}
     explicit CA(py::dict agent_modelObjs,settings_t settings_) {
@@ -47,4 +46,3 @@ PYBIND11_MODULE(CA, m) {
             .def("run", &CA::run);
 };
 
-#endif //PYTHON
