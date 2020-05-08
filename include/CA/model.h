@@ -28,19 +28,24 @@ class Model:public enable_shared_from_this<Model<dim>>{
     friend class Cell<dim>;
     friend class Patch<dim>;
 public:
-    Model(settings_t settings);             
+    Model(py::dict agent_modelObjs);
     ~Model(){};
     bool setup();        
-    void run();    
+    py::dict run();
+    void reset();
     void  visualize() const; //!< To log requrested outputs for visualization
-
+    static void initialize_patchmodel(py::object &patch_model){
+        Patch<dim>::patch_model() = patch_model;
+    };
     static std::map<std::string,std::vector<unsigned>>& agent_counts(){
         static std::map<std::string,std::vector<unsigned>> var{}; return var;
     };
     static domain_data_t& data(){
         static domain_data_t var{}; return var;
     }; // trajectory of domain results taged based on patch, self, etc.
-
+    static settings_t & settings(){static settings_t var{}; return var;};
+    
+    std::map<string,py::object>  agent_models;
 protected:
     bool append_flag=false;
     void _update();
@@ -50,23 +55,36 @@ protected:
     unsigned start_passaging_n;
     unsigned passaging_count;
     unsigned duration_ticks;    //!< experiment duration
-    settings_t settings;
+    
     domain_measurements_scheme_t measurements_scheme; //! the scheme for obtaining #data
-    static bool& saturation_flag(){
-        static bool var{}; return var;
-    };
+
 };
 template<unsigned dim>
-inline Model<dim>::Model(settings_t settings_):
+void Model<dim>::reset(){
+    agent_counts().clear();
+    data().clear();
+    Patch<dim>::container().clear();
+    Patch<dim>::configs().clear();
+    Cell<dim>::container().clear();
+    
+    
+}
+template<unsigned dim>
+inline Model<dim>::Model(py::dict agent_modelObjs):
         iCount(0)
 {     
     srand(time(0));
-    settings = settings_;
-   
+   auto keys = agent_modelObjs.attr("keys")();
+   for (auto &key:keys) {
+       py::object agent_model = agent_modelObjs[key];
+       std::string agent_type = key.cast<string>();
+       agent_models.insert(std::pair<std::string,py::object>(agent_type,agent_model));
+   }
 }
 
 template<unsigned dim>
 inline bool Model<dim>::setup(){
+    tools::create_directory(main_output_folder);
      auto CHECK_PARAMS = [&](){
         // auto pIter = inputs::params()["passaging_n"];
         // if (pIter > inputs::params()["end_passaging_n"]){
@@ -97,10 +115,10 @@ inline bool Model<dim>::setup(){
         // this->passaging_count = 1;
         // if (settings["configs"]["end_passaging_n"] != nullptr) this->end_passaging_n = settings["configs"]["end_passaging_n"];
         // else this->end_passaging_n = this->start_passaging_n;
-        this->duration_ticks = py::cast<unsigned>(settings["configs"]["exp_duration"]);
+        this->duration_ticks = py::cast<unsigned>(settings()["configs"]["exp_duration"]);
 
         auto PROCESS_DOMAIN_MEASUREMENTS_SCHEME = [&](){
-            auto measurements = settings["configs"]["domain"]["measurements"];
+            auto measurements = settings()["configs"]["domain"]["measurements"];
             map<string,variant<string,vector<string>>> m_item;
             for (auto &m_item_:measurements){
                 m_item.clear();
@@ -119,8 +137,8 @@ inline bool Model<dim>::setup(){
         PROCESS_DOMAIN_MEASUREMENTS_SCHEME();   
     };
     INITIALIZE_VARIABLES();
-    Patch<dim>::setup_patches(this->shared_from_this(), settings["configs"]);
-    Cell<dim>::setup_cells(this->shared_from_this(), settings["configs"]);
+    Patch<dim>::setup_patches(this->shared_from_this(), settings()["configs"]);
+    Cell<dim>::setup_cells(this->shared_from_this(), settings()["configs"]);
     this->append_flag = true;
     this->_update();
     return true;
@@ -132,16 +150,12 @@ inline bool Model<dim>::setup(){
 
 
 template<unsigned dim>
-inline void Model<dim>::run(){
+inline py::dict Model<dim>::run(){
     auto EXECUTE = [&](){
-        if (Patch<dim>::container().size() < Cell<dim>::container().size()){
-            cout<<"got it"<<endl;
-            saturation_flag() = true;
-        }
-
         this->append_flag = true;
         visualize();
         // cout<<"visualized"<<endl;
+        
         Patch<dim>::run(iCount);
         // cout<<"patch runned"<<endl;
         Cell<dim>::run(iCount);
@@ -191,10 +205,25 @@ inline void Model<dim>::run(){
         std::cout<<endl;
 
     };
+    _clock::start();
     TIME_CONTROL();
-    // return results_repos;
+    
+    // returns
+    py::dict returns;
+    for (auto &key_:settings()["returns"].attr("keys")()){
+        string key = py::cast<string>(key_);
+        if (key == "agents_count"){
+            vector<unsigned> time_points = py::cast<vector<unsigned>>(settings()["returns"][key_]);
+            auto sliced_data = tools::slice_map(agent_counts(),time_points);
+            py::dict returns1 = py::cast(sliced_data);
+            returns[key_] = returns1;
+        }
+//        cout<<key<<endl;
+    };
+    
+    _clock::end();
     cout<<"Run completed"<<endl;
-
+    return returns;
 }
 
 
@@ -259,7 +288,7 @@ inline void Model<dim>::_update(){
             auto cell =  Cell<dim>::container()[i];
             agent_counts_single[cell->c_type]++;
         }
-        for (auto &agent_model:Cell<dim>::agent_models()){
+        for (auto &agent_model:agent_models){
             auto agent_tag = agent_model.first;
             if (agent_counts_single.find(agent_tag) == agent_counts_single.end()){ // this agent doesnt have any record in container
                 agent_counts_single[agent_tag] = 0;
@@ -335,13 +364,13 @@ inline void Model<dim>::_update(){
 
 template<unsigned dim>
 inline void Model<dim>::visualize() const {
-    bool logs_flag = py::cast<bool>(settings["logs"]["flag"]);
+    bool logs_flag = py::cast<bool>(settings()["logs"]["flag"]);
     if (!logs_flag) return; // no visualization
     // /***  cell distriburion visualization ***/
     // std::chrono::seconds dura( 2);
     // std::this_thread::sleep_for( dura );
-    Cell<dim>::visualize(iCount,settings["logs"]);
-    Patch<dim>::visualize(iCount,settings["logs"]);
+    Cell<dim>::visualize(iCount,settings()["logs"]);
+    Patch<dim>::visualize(iCount,settings()["logs"]);
 }
 
 

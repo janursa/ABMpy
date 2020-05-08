@@ -27,6 +27,23 @@ namespace tools{
     float       create_random_value(float, float);         //!< Creates an stochastic value between two given magnitudes
     template <typename T>
     void        log_vector(vector<T> &vec); //!< Logs the given vector to terminal
+    template<typename T>
+    std::map<string,std::vector<T>> slice_map(std::map<string,std::vector<T>> &data,vector<unsigned> &indices); //!< slices a map data with given indices
+}
+
+template<typename T>
+std::map<string,std::vector<T>> tools::slice_map(std::map<string,std::vector<T>> &data,vector<unsigned> &indices){
+    std::map<string,std::vector<T>> sliced_data;
+    for (auto &row_data:data){
+        std::vector<T> sliced_row;
+//        log_vector(row_data.second);
+        for (auto &index:indices){
+            sliced_row.push_back(row_data.second[index-1]);
+        }
+//        log_vector(sliced_row);
+        sliced_data.insert(std::pair<string,std::vector<T>>(row_data.first,sliced_row));
+    }
+    return sliced_data;
 }
 
 template <typename T>

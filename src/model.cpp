@@ -1,3 +1,4 @@
+
 /* Copyright (C) 2019 Jalil Nourisa - All Rights Reserved
  * You may use, distribute and modify this code under the
  * terms of the XYZ license, which unfortunately won't be
@@ -16,34 +17,23 @@
  */
 // #include <pybind11/pybind11.h>
 #include <iostream>
-#include "model.h"
+#include <CA/model.h>
 using std::cout;
 struct CA{
     CA() {}
-    explicit CA(py::dict agent_modelObjs,py::object patch_model,settings_t settings_) {
-    	// add the controllers to controllers() by taging them based on cell type
-    	auto keys = agent_modelObjs.attr("keys")();
-    	for (auto &key:keys) {
-    		py::object agent_model = agent_modelObjs[key];
-    		std::string agent_type = key.cast<string>();
-    		Cell<DIM>::agent_models().insert(std::pair<std::string,py::object>(agent_type,agent_model));
-    	}
-
-        Patch<DIM>::patch_model() = patch_model;
-
-        settings = settings_;
+    explicit CA(py::dict agent_modelObjs,py::object patch_model,settings_t settings) {
+        // add the controllers to controllers() by taging them based on cell type
+        model = make_shared<Model<DIM>> (agent_modelObjs,patch_model);
+        Model<DIM>::initialize_patchmodel(patch_model);
+        Model<DIM>::settings() = py::dict(settings);
     }
-    bool run() {
-        // 
-        _clock::start();
-    	tools::create_directory(main_output_folder);
-        auto model = make_shared<Model<DIM>> (settings);
-		model->setup();
-		model->run();
-        _clock::end();
-        return true;
+    std::shared_ptr<Model<DIM>> model;
+    py::dict run() {
+        model->setup();
+        py::dict returns = model->run();
+        model->reset();
+        return returns;
     }
-    settings_t settings;
 };
 
 PYBIND11_MODULE(CA, m) {

@@ -77,9 +77,10 @@ inline shared_ptr<Patch<dim>> Patch<dim>::find_an_empty_patch(shared_ptr<Patch<d
 
 template<unsigned dim>
 inline void Patch<dim>::run(unsigned const & iCount){
-
-    for (auto &patch:Patch<dim>::container()) patch->function();
-
+    
+    for (auto &patch:Patch<dim>::container()) {
+        patch->function();
+    }
     // medium change
     // auto MEDIUM_CHANGE = [&]() {
     //     LOG("changing medium");
@@ -316,14 +317,10 @@ inline void Patch<dim>::update_patch_inputs(){
         shared_ptr<Cell<dim>> agent;
         try{ agent =  this->getCell();}
         catch(logic_error &er){return;}
-        for (auto &tag_:patch_model().attr("inputs")["agent"].attr("keys")()){ // collecting inputs from patch
-            float value;
-            auto tag = py::cast<string>(tag_);
-            try {value =agent->data.at(tag);}
-            catch (out_of_range & er) {
-                cerr<<"The input key '"<<tag<<"' for patch [agent] is not defined in agent attributes "<<endl;
-                std::terminate();
-            } 
+        for (auto &tag_:patch_model().attr("inputs")["agent"].attr("keys")()){ // collecting inputs from agent
+            string tag = py::cast<string>(tag_);
+           
+            float value = agent->data[tag];
             
             vector<float> values {value};
             patch_model().attr("inputs")["agent"][tag_] = value ;

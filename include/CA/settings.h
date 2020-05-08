@@ -1,7 +1,7 @@
 
 #pragma once
+#include <iostream>
 #include <variant>
-#include <any>
 #include <string>
 #include <pybind11/pybind11.h>
 namespace py = pybind11;
@@ -46,7 +46,6 @@ using settings_t = py::dict;
 
 //** directories **//
 
-const std::string root_dir = "/Users/matin/Downloads/testProjs/ABM/";
 const std::string main_output_folder = "outputs/";
 
 struct invalid_directory{

@@ -1,10 +1,36 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.13.1)
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+
 SET(TARGET "CA")
 PROJECT(${TARGET} VERSION 1.0 LANGUAGES CXX)
-set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake")
-include(cotire)
+
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+
+    set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+    set(CMAKE_CXX_EXTENSIONS OFF)
+    include(CTest)
+    find_package(Doxygen)
+    if(Doxygen_FOUND)
+        add_subdirectory(docs)
+    else()
+        message(STATUS "Doxygen not found, not building docs")
+    endif()
+endif()
+
+
+include(FetchContent)
+if(${CMAKE_VERSION} VERSION_LESS 3.14)
+    include(cmake/add_FetchContent_MakeAvailable.cmake)
+endif()
+
+FetchContent_Declare(
+  fmtlib
+  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+  GIT_TAG        5.3.0
+)
+FetchContent_MakeAvailable(fmtlib)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -15,20 +41,14 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(pybind11)
 set(PYBIND11_CPP_STANDARD -std=c++17)
 
-set(JSON_BuildTests OFF CACHE INTERNAL "")
-include(FetchContent)
-FetchContent_Declare(
-  nlohmann
-  GIT_REPOSITORY https://github.com/nlohmann/json.git
-  GIT_TAG        develop
-)
-FetchContent_MakeAvailable(nlohmann)
+if((CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME OR MODERN_CMAKE_BUILD_TESTING) AND MODULE)
+    add_subdirectory(src)
+endif()
 
-add_library(${TARGET} MODULE ${CMAKE_SOURCE_DIR}/src/main.cpp)
-cotire(${TARGET})
-target_link_libraries(${TARGET} PRIVATE pybind11::module)
-target_link_libraries(${TARGET} PRIVATE nlohmann_json::nlohmann_json)
-set_target_properties(${TARGET} PROPERTIES PREFIX "${PYTHON_MODULE_PREFIX}"
-                                         SUFFIX "${PYTHON_MODULE_EXTENSION}")
-# pybind11_add_module(${CA} ${TARGET_SRC})
+
+if((CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME OR MODERN_CMAKE_BUILD_TESTING) AND TESTING)
+    add_subdirectory(tests)
+endif()
+
+
 

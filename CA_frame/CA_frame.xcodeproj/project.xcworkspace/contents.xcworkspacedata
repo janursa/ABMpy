@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:../../tests">
+   </FileRef>
+   <FileRef
+      location = "group:../../include">
+   </FileRef>
+   <FileRef
+      location = "group:../../src">
+   </FileRef>
+   <FileRef
+      location = "self:CA_frame.xcodeproj">
+   </FileRef>
+</Workspace>
