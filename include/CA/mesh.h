@@ -3,13 +3,17 @@
 //
 
 #pragma once
-
+#include "model.h"
 
 using namespace std;
+
+template <unsigned dim>
+class Model;
 //!  This class is the mesh class
 /*!
   A more elaborate class description.
 */
+template<unsigned dim>
 class Mesh{
 public:
     Mesh(int index, float x, float y):mesh_index(index), x_coord(x), y_coord(y) {
@@ -26,10 +30,14 @@ public:
     std::vector<unsigned> neighbor_indices; //!< Indices of meshes located in the neumann boundary
     float x_coord;
     float y_coord;
-    static vector<shared_ptr<Mesh>>& meshes(){
-        static vector<shared_ptr<Mesh>> var{}; //!< Container of mesh objects
-        return var;
-    }; //!< Container of mesh objects
+    static weak_ptr<Model<dim>>& _modelPtr(){static  weak_ptr<Model<dim>> var{}; return var;};
+    static std::shared_ptr<Model<dim>> get_modelPtr(){
+        shared_ptr<Model<dim>> p = _modelPtr().lock();
+        if (!p){
+            throw logic_error("Weak_ptr (_modelPtr inside mesh) expired)");
+        }
+        return p;
+    }
 
     static void setup_meshes(float domain_x_l, float domain_y_l, float patch_size){
 
@@ -45,7 +53,7 @@ public:
                 auto meshPtr = make_shared<Mesh>(mesh_index,x,y);
                 auto neighbor_indices = find_neighborhood(i,j);
                 meshPtr->neighbor_indices = neighbor_indices;
-                meshes().push_back(meshPtr);
+                get_modelPtr()->meshes_container.push_back(meshPtr);
                 mesh_count ++;
             }
 
@@ -55,7 +63,7 @@ public:
     }
     static Mesh* at(unsigned index){
         try {
-            return meshes()[index].get();
+            return get_modelPtr()->meshes_container[index].get();
         }catch(out_of_range&ofr){
             cerr<<"error";
             throw ofr;
@@ -80,8 +88,8 @@ public:
     } ; ; //!< Mesh number in y direction
 };
 
-
-inline vector<unsigned> Mesh::find_neighborhood(int &x, int &y) {
+template<unsigned dim>
+inline vector<unsigned> Mesh<dim>::find_neighborhood(int &x, int &y) {
     vector<unsigned> neighbor_indices;
     int neighbor_numbers = 8;
     int x_index[neighbor_numbers];

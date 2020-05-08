@@ -25,20 +25,14 @@ public:
     Cell(string);                                       //!< Cell constructor
     explicit Cell(std::shared_ptr<Cell<dim>> &cellPtr); //!< Cell constructor based on a given cell. This is used in proliferation. #_attr is transferred to the child cell.
     virtual ~Cell();
-    static void setup_cells(weak_ptr<Model<dim>> mPtr,settings_t configs_);
-    static void run(const unsigned & iCount){
-            for (int ii=0; ii< Cell<dim>::container().size(); ii++) {
-                Cell<dim>::container()[ii]->function();
-            }
-        }
-    static void update();                              //!< Updates class variables
-    static const void visualize(const unsigned &iCount,const settings_t &specs);
+    // static void setup_cells(weak_ptr<Model<dim>> mPtr,settings_t configs_);
+    
     static shared_ptr<Model<dim>> getModelPointer();    //!< Returns _mPtr                                                          //!< creates a cell based on the given type and locate its randomly in the domain
 
     static shared_ptr<Cell<dim>> hatch_a_cell(shared_ptr<Patch<dim>>& host_patch, std::shared_ptr<Cell<dim>> & ref_cell);
     static shared_ptr<Cell<dim>> hatch_a_cell(shared_ptr<Patch<dim>>& host_patch, string cell_type);
 
-    static void initialize_attributes(shared_ptr<Cell<dim>> &agent);
+    void initialize_attributes();
     
 
     bool has_patch = false;
@@ -55,13 +49,10 @@ public:
     bool walk_flag = false;
     bool disappear_flag = false;
 
-    static vector<shared_ptr<Cell<dim>>>& container(){
-        static vector<shared_ptr<Cell<dim>>> var{};
-        return var;
-    };   //!< Bank of Cell.
-    static settings_t& configs(){
-        static settings_t var{};
-        return var;
+    
+    settings_t configs(){
+        return getModelPointer()->settings["configs"];
+        
     };
     static weak_ptr<Model<dim>>& _mPtr(){     //!< Weak pointer to the model
         static weak_ptr<Model<dim>> var{};
@@ -92,236 +83,24 @@ inline shared_ptr<Cell<dim>> Cell<dim>::hatch_a_cell(shared_ptr<Patch<dim>>& hos
     shared_ptr<Cell<dim>> cPtr(new Cell<dim>(cell_type));
     host_patch->setCell(cPtr);   // cross-association
     cPtr->setPatch(host_patch);  // cross-association
-    initialize_attributes(cPtr);
+    cPtr->initialize_attributes();
     return cPtr;
 }
 
 
 template<unsigned dim>
-inline const void Cell<dim>::visualize(const unsigned &iCount,const settings_t &specs){
-
-    auto SCATTER_LOG = [&](auto &item){
-        vector<string> tags = py::cast<vector<string>>(item["tags"]);
-        string dir =py::cast<string>(item["dir"]);
-        ofstream O(dir);
-        O<<"x,y,type";
-        for (auto &tag:tags){
-        O<<","<<tag;
-        }
-        O<<"\n";
-        unsigned ii =0;
-        for (auto &agent:container()){
-        float x = agent->getPatch()->xyzcoords[0];
-        float y = agent->getPatch()->xyzcoords[1];
-        // if (ii == 0) cout<<agent->getPatch()->patchIndex<<endl;
-
-        string type = agent->c_type;
-        O<<x<<","<<y<<","<<type;
-        for (auto &tag:tags){
-            float value;
-            try {value = agent->data.at(tag);}
-            catch(out_of_range &er){
-                cerr<<"Error: '"<<tag<<"' requested for visualization is not defined in agent attributes"<<endl;
-                std::terminate();
-            }
-            O<<","<<value;
-          }
-        O<<"\n";
-        ii++;
-        }
-        O.close();
-    };
-    auto AGENT_COUNT_LOG = [&](auto &item){
-        string dir =py::cast<string>(item["dir"]);
-        ofstream O(dir);
-        unsigned ii =0;
-        for (auto &agent_count_item: Model<dim>::agent_counts()){
-            auto agent_tag = agent_count_item.first;
-            if (ii == 0) {
-                O << agent_tag;
-            }
-            else O<<","<<agent_tag;
-            ii++;
-        }
-        O<<"\n";
-        for (unsigned iter =0; iter != iCount; iter++){
-            unsigned ii =0;
-            for (auto &agent_count_item: Model<dim>::agent_counts()){
-                auto value = agent_count_item.second[iter];
-                if (ii == 0) O << value;
-                else O<<","<<value;
-                ii++;
-            }
-            O<<"\n";
-        }
-
-        O.close();
-    };
-    auto TRAJ_LOG = [&](auto &item){
-        string dir = py::cast<string>(item["dir"]);
-        ofstream O(dir);
-        vector<string> tags = py::cast<vector<string>>(item["tags"]);
-        //header
-        unsigned ii = 0;
-        for (auto &tag:tags){
-            if (ii == 0) O<<tag;
-            else O<<","<<tag;
-            ii ++;
-        }
-        O<<"\n";
-
-        for (unsigned iter =0; iter != iCount; iter++){
-            unsigned ii =0;
-            for (auto &tag: tags){
-                if (Model<dim>::data()["agent"].find(tag) == Model<dim>::data()["agent"].end()){
-                    std::cerr<<RED<<"Error: "<<RESET<<" the tag '"<<RED<<tag<<RESET<<"' requested for agent log but missing in the domain variables."<<endl;
-                    std::terminate();
-                }
-                else{
-                    auto value = Model<dim>::data()["agent"][tag][iter];
-                    if (ii == 0) O << value;
-                    else O<<","<<value;
-                    ii++;
-                }
-
-            }
-            O<<"\n";
-        }
-        O.close();
-    };
-    for (auto &item:specs["agent"]){
-        bool item_logs_flag = py::cast<bool>(item["flag"]);
-        if (item_logs_flag == false) continue;
-        unsigned interval = py::cast<unsigned>(item["interval"]);
-        if (iCount != 0) {
-            if ( iCount % interval != 0) continue;  // interval is not met
-        }
-        string type = py::cast<string>(item["type"]);
-        if (type == "scatter") SCATTER_LOG(item);
-        else if (type == "agents_count_traj") AGENT_COUNT_LOG(item);
-        else if (type == "traj") TRAJ_LOG(item);
-        else {
-            std::cerr<<RED<<"Error: "<<RESET<<" type of log entered as '"<<RED<<type<<RESET<<"' is not acceptable."<<endl;
-            std::terminate();
-        }
-
-    }
-
-
-}
-template<unsigned dim>
-inline void Cell<dim>::initialize_attributes(shared_ptr<Cell<dim>> &agent){
-    py::str tag = py::cast(agent->c_type);
+inline void Cell<dim>::initialize_attributes(){
+    py::str tag = py::cast(c_type);
     // cout<<"start"<<endl;
     for (auto attr_key:configs()["agents"][tag]["attrs"].attr("keys")()){
-        string attr = attr_key.cast<string>();
-        float value = configs()["agents"][tag]["attrs"][attr_key].cast<float>();
-        agent->data.insert(std::pair<string,float>(attr,value));
+        string attr = py::cast<string>(attr_key);
+        float value = py::cast<float>(configs()["agents"][tag]["attrs"][attr_key]);
+        this->data.insert(std::pair<string,float>(attr,value));
     }
     // cout<<"end"<<endl;
 }
 
 
-template<unsigned dim>
-inline void Cell<dim>::setup_cells(weak_ptr<Model<dim>> mPtr,settings_t configs_){
-    _mPtr() = mPtr;
-    configs() = configs_;
-    // create the agents
-    for (auto key:configs()["agents"].attr("keys")()){
-        unsigned agent_count = configs()["agents"][key]["initial_n"].cast<unsigned>();
-
-        string agent_name = key.cast<string>();
-        // create initial agents and assign attributes
-        for(int iter=0; iter<agent_count; iter++) {
-            try{
-                auto host_patch = Patch<dim>::find_an_empty_patch();
-                auto agent = hatch_a_cell(host_patch,agent_name);
-                container().push_back(agent);
-            }catch(no_available_patch&nap){
-                cerr<<"Error:: no available patch for agents during setup"<<endl;
-                std::terminate();
-            }
-        }
-
-    }
-    string message = std::to_string(container().size()) + " cells successfully created";
-    LOG(message);
-}
-
-template<unsigned dim>
-inline void Cell<dim>::update() {
-    /*** Update age-related members ***/
-
-    for (auto &cell:Cell<dim>::container()){
-        if (cell->switch_info.first == true){ // switch
-            // cout<<"switching"<<endl;
-            shared_ptr<Patch<dim>> host_patch = cell->getPatch();
-            string new_type = cell->switch_info.second;
-            host_patch->removeCell();
-            auto new_cell = Cell<dim>::hatch_a_cell(host_patch,new_type);
-            auto pos = distance(container().begin(), find(container().begin(), container().end(), cell));
-            container()[pos] = new_cell;
-        }
-    }
-
-    /* in case of disappear, Cell<dim>::container() needs to be updated */
-
-    int jj = 0;
-    while (true) {
-        if (jj >= Cell<dim>::container().size()) break;
-        for (int ii = jj; ii < Cell<dim>::container().size(); ii++) {
-            if (Cell<dim>::container()[ii]->disappear_flag == true) {
-                Cell<dim>::container().erase(Cell<dim>::container().begin() + ii);
-                break;
-            }
-            jj++;
-        };
-    }
-
-    /*** Check for mitosis ***/
-    for (unsigned iter = 0 ; iter < Cell<dim>::container().size(); iter++){
-        auto cell = Cell<dim>::container()[iter];
-        if (cell->hatch_flag == true) {
-            // cout<<"hatching"<<endl;
-            shared_ptr<Cell<dim>> new_agent;
-            try {
-                shared_ptr<Patch<dim>> ref_patch = cell->getPatch();
-                shared_ptr<Patch<dim>> host_patch = Patch<dim>::find_an_empty_patch(ref_patch);
-                shared_ptr<Cell<dim>> ref_cell = cell->getPtr();
-                new_agent = hatch_a_cell(host_patch,ref_cell);
-                container().push_back(new_agent);
-            } catch (no_available_patch & er) {
-                // cerr<<"Warning: hatch cannot occur due to high agent density"<<endl;
-                continue;
-            }
-            cell->hatch_flag = false;
-            new_agent->hatch_flag = false;
-            cell->data["hatch_cycle_c"]++;
-            new_agent->data["hatch_cycle_c"]++;
-        }
-    }
-
-
-
-    for (unsigned iter = 0; iter < Cell<dim>::container().size(); iter++){
-        // cout<<iter<<" out of "<<Cell<dim>::container().size()<<endl;
-        auto cell =  Cell<dim>::container()[iter];
-        if (cell->walk_flag == false) continue;
-        // cout<<"M 1"<<endl;
-        shared_ptr<Patch<dim>> destination;
-        shared_ptr<Patch<dim>> ref_patch = cell->getPatch();
-        try {destination = Patch<dim>::find_an_empty_patch(ref_patch);}
-        catch (no_available_patch & err) {
-            continue;
-        }
-        auto current_patch = cell->getPatch();
-        current_patch->removeCell();
-        destination->setCell(cell);
-        cell->setPatch(destination);
-    }
-
-
-}
 
 
 

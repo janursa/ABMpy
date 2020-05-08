@@ -22,10 +22,7 @@ using std::cout;
 struct CA{
     CA() {}
     explicit CA(py::dict agent_modelObjs,py::object patch_model,settings_t settings) {
-        // add the controllers to controllers() by taging them based on cell type
-        model = make_shared<Model<DIM>> (agent_modelObjs,patch_model);
-        Model<DIM>::initialize_patchmodel(patch_model);
-        Model<DIM>::settings() = py::dict(settings);
+        model = make_shared<Model<DIM>> (agent_modelObjs,patch_model,settings);
     }
     std::shared_ptr<Model<DIM>> model;
     py::dict run() {
