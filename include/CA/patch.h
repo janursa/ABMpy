@@ -10,7 +10,7 @@ using namespace std;
 template <unsigned dim>
 class Model;
 template <unsigned dim>
-class Cell;
+class Agent;
 //!  Patch class
 /*!
   A more elaborate class description.
@@ -35,11 +35,11 @@ public:
     void receive_patch_outputs();
     void function();
 
-    void removeCell();        //!< Removes cell from patch
+    void removeAgent();        //!< Removes cell from patch
     void initialize();             //!< initialize patch variables
-    bool hasCell() const;
-    void setCell(shared_ptr<Cell<dim>> cellPtr);
-    shared_ptr<Cell<dim>> getCell();
+    bool hasAgent() const;
+    void setAgent(shared_ptr<Agent<dim>> cellPtr);
+    shared_ptr<Agent<dim>> getAgent();
     vector<std::shared_ptr<Patch<dim>>> neighborPatches;
     std::map<std::string,float> data; 
     vector<float> xyzcoords; 
@@ -49,9 +49,9 @@ public:
         return get_modelPtr()->patch_model;
     }
     static weak_ptr<Model<dim>>& _modelPtr(){static  weak_ptr<Model<dim>> var{}; return var;};
-    bool _hasCell;
+    bool _hasAgent;
 private:
-    weak_ptr<Cell<dim>> _cellPtr;
+    weak_ptr<Agent<dim>> _cellPtr;
     
 
 };
@@ -60,7 +60,7 @@ private:
 
 template<unsigned dim>
 inline Patch<dim>::Patch(){
-    _hasCell = false;
+    _hasAgent = false;
 }
 template <unsigned dim>
 inline void Patch<dim>::initialize(){
@@ -71,29 +71,29 @@ inline void Patch<dim>::initialize(){
     }
 }
 template<unsigned dim>
-inline void Patch<dim>::setCell(shared_ptr<Cell<dim>> pPtr){
+inline void Patch<dim>::setAgent(shared_ptr<Agent<dim>> pPtr){
     if (!pPtr) {
-        std:cerr<<"Cell pointer is null"<<endl;
+        std:cerr<<"Agent pointer is null"<<endl;
         std::terminate();
     }
     try{
-        this->_cellPtr  = weak_ptr<Cell<dim>>(pPtr);
+        this->_cellPtr  = weak_ptr<Agent<dim>>(pPtr);
     } catch(...){
         std::cerr<<"couldn't convert to shared ptr in set cell"<<endl;
 
     }
 
-    _hasCell = true;
+    _hasAgent = true;
 }
 template <unsigned dim>
-void Patch<dim>::removeCell(){
-    _hasCell = false;
+void Patch<dim>::removeAgent(){
+    _hasAgent = false;
     this->_cellPtr.reset();
 }
 
 template<unsigned dim>
-inline shared_ptr<Cell<dim>> Patch<dim>::getCell(){
-    shared_ptr<Cell<dim>> p = _cellPtr.lock();
+inline shared_ptr<Agent<dim>> Patch<dim>::getAgent(){
+    shared_ptr<Agent<dim>> p = _cellPtr.lock();
     if (!p) {
         throw logic_error("Weak_ptr (_cellPtr inside patch) expired");
     }
@@ -110,8 +110,8 @@ inline std::shared_ptr<Model<dim>> Patch<dim>::get_modelPtr(){
 }
 
 template<unsigned dim>
-inline bool Patch<dim>::hasCell() const{
-    return _hasCell;
+inline bool Patch<dim>::hasAgent() const{
+    return _hasAgent;
 }
 
 
@@ -133,8 +133,8 @@ inline void Patch<dim>::update_patch_inputs(){
     };
     // for patch inputs
     auto EXTRACT_AGENT_INPUTS = [&](){
-        shared_ptr<Cell<dim>> agent;
-        try{ agent =  this->getCell();}
+        shared_ptr<Agent<dim>> agent;
+        try{ agent =  this->getAgent();}
         catch(logic_error &er){return;}
         for (auto &tag_:get_patch_model().attr("inputs")["agent"].attr("keys")()){ // collecting inputs from agent
             string tag = py::cast<string>(tag_);
@@ -172,7 +172,7 @@ inline void Patch<dim>::receive_patch_outputs(){
     auto RECEIVE_AGENT_OUTPUTS = [&](py::dict sub_output){
         for (const auto event_key_:sub_output.attr("keys")()){
                 auto event_key = py::cast<string>(event_key_);
-                try {this->getCell()->data[event_key] = py::cast<float>(sub_output[event_key_]);}
+                try {this->getAgent()->data[event_key] = py::cast<float>(sub_output[event_key_]);}
                 catch(logic_error&er) {continue;};
             }
         };

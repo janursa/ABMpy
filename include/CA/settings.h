@@ -10,28 +10,6 @@ namespace py = pybind11;
 #define DEBUG
 
 
-#include <chrono>
-struct _clock {
-    void static start(){
-        _clock::_begin() = std::chrono::steady_clock::now();
-    }
-    void static end(){
-        _clock::_end() = std::chrono::steady_clock::now();
-        std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::seconds>(_end() - _begin()).count() << "[s]" << std::endl;
-    }
-    static std::chrono::steady_clock::time_point& _begin(){
-        static std::chrono::steady_clock::time_point var{};
-        return var;
-    };
-    static std::chrono::steady_clock::time_point& _end(){
-        static std::chrono::steady_clock::time_point var{};
-        return var;
-    };
-
-};
-
-
-
 // *** constants ***// 
 const unsigned DIM = 2; 
 #ifdef DEBUG
@@ -48,20 +26,7 @@ using settings_t = py::dict;
 
 const std::string main_output_folder = "outputs/";
 
-struct invalid_directory{
-    invalid_directory(std::string msg):message(msg){}
-    std::string message;
-};
-struct convergence_error{
-    convergence_error(std::string msg):message(msg){}
-    std::string message;
-    const char *what() const throw() {
-        return message.c_str();
-    }
-};
-struct no_available_patch{
-	no_available_patch(){}
-};
+
 
 #define RESET   "\033[0m"
 #define BLACK   "\033[30m"      /* Black */

@@ -10,7 +10,7 @@
 #include "toolbox.h"
 #include "settings.h"
 template <unsigned dim>
-class Cell;
+class Agent;
 template <unsigned dim>
 class Patch;
 template <unsigned dim>
@@ -20,17 +20,17 @@ class Model;
 /*!
 */
 template<unsigned dim>
-class Cell:public enable_shared_from_this<Cell<dim>>{
+class Agent:public enable_shared_from_this<Agent<dim>>{
 public:
-    Cell(string);                                       //!< Cell constructor
-    explicit Cell(std::shared_ptr<Cell<dim>> &cellPtr); //!< Cell constructor based on a given cell. This is used in proliferation. #_attr is transferred to the child cell.
-    virtual ~Cell();
+    Agent(string);                                       //!< Agent constructor
+    explicit Agent(std::shared_ptr<Agent<dim>> &cellPtr); //!< Agent constructor based on a given cell. This is used in proliferation. #_attr is transferred to the child cell.
+    virtual ~Agent();
     // static void setup_cells(weak_ptr<Model<dim>> mPtr,settings_t configs_);
     
     static shared_ptr<Model<dim>> getModelPointer();    //!< Returns _mPtr                                                          //!< creates a cell based on the given type and locate its randomly in the domain
 
-    static shared_ptr<Cell<dim>> hatch_a_cell(shared_ptr<Patch<dim>>& host_patch, std::shared_ptr<Cell<dim>> & ref_cell);
-    static shared_ptr<Cell<dim>> hatch_a_cell(shared_ptr<Patch<dim>>& host_patch, string cell_type);
+    static shared_ptr<Agent<dim>> hatch_a_cell(shared_ptr<Patch<dim>>& host_patch, std::shared_ptr<Agent<dim>> & ref_cell);
+    static shared_ptr<Agent<dim>> hatch_a_cell(shared_ptr<Patch<dim>>& host_patch, string cell_type);
 
     void initialize_attributes();
     
@@ -39,10 +39,10 @@ public:
 
     void setPatch(shared_ptr<Patch<dim>> pPtr);         //!< Sets _patchPtr
     shared_ptr<Patch<dim>> getPatch();                  //!< Returns _patchPtr
-    std::shared_ptr<Cell<dim>> getPtr();                //!< Returns a shared pointer of the current cell (this).
-    void function();                        //!< Cell function. This is the main function that calls all other cell activity functions such as #_mitosisFunc and #_diffFunc.
+    std::shared_ptr<Agent<dim>> getPtr();                //!< Returns a shared pointer of the current cell (this).
+    void function();                        //!< Agent function. This is the main function that calls all other cell activity functions such as #_mitosisFunc and #_diffFunc.
 
-    string c_type;                                      //!< Cell's type based on #cell_t
+    string c_type;                                      //!< Agent's type based on #cell_t
     map<string,float> data;
     std::pair <bool,std::string> switch_info = std::make_pair(false,"");
     bool hatch_flag = false;
@@ -72,16 +72,16 @@ protected:
 
 };
 template<unsigned dim>
-inline shared_ptr<Cell<dim>> Cell<dim>::hatch_a_cell(shared_ptr<Patch<dim>>& host_patch, std::shared_ptr<Cell<dim>> & ref_cell){
-    shared_ptr<Cell<dim>> cPtr(new Cell<dim>(ref_cell));
-    host_patch->setCell(cPtr);   // cross-association
+inline shared_ptr<Agent<dim>> Agent<dim>::hatch_a_cell(shared_ptr<Patch<dim>>& host_patch, std::shared_ptr<Agent<dim>> & ref_cell){
+    shared_ptr<Agent<dim>> cPtr(new Agent<dim>(ref_cell));
+    host_patch->setAgent(cPtr);   // cross-association
     cPtr->setPatch(host_patch);  // cross-association
     return cPtr;
 }
 template<unsigned dim>
-inline shared_ptr<Cell<dim>> Cell<dim>::hatch_a_cell(shared_ptr<Patch<dim>>& host_patch, string cell_type ){
-    shared_ptr<Cell<dim>> cPtr(new Cell<dim>(cell_type));
-    host_patch->setCell(cPtr);   // cross-association
+inline shared_ptr<Agent<dim>> Agent<dim>::hatch_a_cell(shared_ptr<Patch<dim>>& host_patch, string cell_type ){
+    shared_ptr<Agent<dim>> cPtr(new Agent<dim>(cell_type));
+    host_patch->setAgent(cPtr);   // cross-association
     cPtr->setPatch(host_patch);  // cross-association
     cPtr->initialize_attributes();
     return cPtr;
@@ -89,7 +89,7 @@ inline shared_ptr<Cell<dim>> Cell<dim>::hatch_a_cell(shared_ptr<Patch<dim>>& hos
 
 
 template<unsigned dim>
-inline void Cell<dim>::initialize_attributes(){
+inline void Agent<dim>::initialize_attributes(){
     py::str tag = py::cast(c_type);
     // cout<<"start"<<endl;
     for (auto attr_key:configs()["agents"][tag]["attrs"].attr("keys")()){
@@ -106,24 +106,24 @@ inline void Cell<dim>::initialize_attributes(){
 
 
 template<unsigned dim>
-inline Cell<dim>::Cell(string cell_type):
+inline Agent<dim>::Agent(string cell_type):
         c_type(cell_type)
 {
 
 }
 template<unsigned dim>
-inline Cell<dim>::Cell(shared_ptr<Cell<dim>> &cellPtr):Cell(cellPtr->c_type){
+inline Agent<dim>::Agent(shared_ptr<Agent<dim>> &cellPtr):Agent(cellPtr->c_type){
    this->c_type = cellPtr->c_type;
    this->data = cellPtr->data;
 }
 
 template<unsigned dim>
-inline Cell<dim>::~Cell(){
+inline Agent<dim>::~Agent(){
 
 }
 
 template<unsigned dim>
-inline void Cell<dim>::setPatch(shared_ptr<Patch<dim>> pPtr){
+inline void Agent<dim>::setPatch(shared_ptr<Patch<dim>> pPtr){
     if (!pPtr) {
         std:cerr<<"null ptr from inside cell"<<endl;
         std::terminate();
@@ -139,7 +139,7 @@ inline void Cell<dim>::setPatch(shared_ptr<Patch<dim>> pPtr){
 
 
 template<unsigned dim>
-inline shared_ptr<Patch<dim>> Cell<dim>::getPatch(){
+inline shared_ptr<Patch<dim>> Agent<dim>::getPatch(){
     if(this->_patchPtr.expired()){
         cout<<"Weak_ptr to patch is exipred"<<endl;
         std::terminate();
@@ -151,17 +151,17 @@ inline shared_ptr<Patch<dim>> Cell<dim>::getPatch(){
 
 
 template <unsigned dim>
-inline shared_ptr<Model<dim>> Cell<dim>::getModelPointer(){
-    return shared_ptr<Model<dim>>(Cell<dim>::_mPtr());
+inline shared_ptr<Model<dim>> Agent<dim>::getModelPointer(){
+    return shared_ptr<Model<dim>>(Agent<dim>::_mPtr());
 }
 
 template<unsigned dim>
-inline std::shared_ptr<Cell<dim>> Cell<dim>::getPtr(){
+inline std::shared_ptr<Agent<dim>> Agent<dim>::getPtr(){
     return this->shared_from_this();
 }
 
 template <unsigned dim>
-inline void Cell<dim>::update_agent_inputs(){
+inline void Agent<dim>::update_agent_inputs(){
     auto main_tags = get_agent_model(this->c_type).attr("inputs").attr("keys")();
     // for self inputs
     auto EXTRACT_SELF_INPUTS = [&](){
@@ -221,7 +221,7 @@ inline void Cell<dim>::update_agent_inputs(){
     // return inputs;
 }
 template <unsigned dim>
-inline void Cell<dim>::receive_agent_outputs(){
+inline void Agent<dim>::receive_agent_outputs(){
     get_agent_model(c_type).attr("forward")();  // updates the outputs in python file
     auto main_tags = get_agent_model(c_type).attr("outputs").attr("keys")();
     auto RECEIVE_SELF_OUTPUTS = [&](py::dict sub_output){
@@ -268,7 +268,7 @@ inline void Cell<dim>::receive_agent_outputs(){
     }
 }
 template <unsigned dim>
-inline void Cell<dim>::function(){
+inline void Agent<dim>::function(){
     this->update_agent_inputs();
     this->receive_agent_outputs();
 }

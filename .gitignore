@@ -4,3 +4,4 @@ docs/*
 xcode/*
 cmake-build-debug/*
 CMakeFiles/*
+outputs/*

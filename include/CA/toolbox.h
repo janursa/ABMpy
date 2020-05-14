@@ -3,7 +3,7 @@
 #include "settings.h"
 #include <fstream>
 #include <random>
-
+#include <chrono>
 using namespace std;
 
 
@@ -29,6 +29,45 @@ namespace tools{
     void        log_vector(vector<T> &vec); //!< Logs the given vector to terminal
     template<typename T>
     std::map<string,std::vector<T>> slice_map(std::map<string,std::vector<T>> &data,vector<unsigned> &indices); //!< slices a map data with given indices
+    struct _clock {
+    void static start(){
+            _clock::_begin() = std::chrono::steady_clock::now();
+        }
+        void static end(){
+            _clock::_end() = std::chrono::steady_clock::now();
+            std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::seconds>(_end() - _begin()).count() << "[s]" << std::endl;
+        }
+        static std::chrono::steady_clock::time_point& _begin(){
+            static std::chrono::steady_clock::time_point var{};
+            return var;
+        };
+        static std::chrono::steady_clock::time_point& _end(){
+            static std::chrono::steady_clock::time_point var{};
+            return var;
+        };
+
+    };
+    struct invalid_directory{
+        invalid_directory(std::string msg):message(msg){}
+        std::string message;
+        const char *what() const throw() {
+            return message.c_str();
+        }
+    };
+    struct convergence_error{
+        convergence_error(std::string msg):message(msg){}
+        std::string message;
+        const char *what() const throw() {
+            return message.c_str();
+        }
+    };
+    struct no_available_patch{
+        no_available_patch(std::string msg):message(msg){}
+        std::string message;
+        const char *what() const throw() {
+            return message.c_str();
+        }
+    };
 }
 
 template<typename T>

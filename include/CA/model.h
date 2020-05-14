@@ -1,12 +1,6 @@
-//
-// Created by nourisaj on 5/24/19.
-//
 
 #ifndef ABM_MODEL_H
 #define ABM_MODEL_H
-
-
-
 #include "patch.h"
 #include "agent.h"
 #include <chrono>
@@ -16,7 +10,7 @@
 #include <pybind11/stl.h>
 namespace py = pybind11;
 template <unsigned dim>
-class Cell;
+class Agent;
 template <unsigned dim>
 class Patch;
 using namespace std;
@@ -26,7 +20,7 @@ using namespace std;
 */
 template<unsigned dim>
 class Model:public enable_shared_from_this<Model<dim>>{
-    friend class Cell<dim>;
+    friend class Agent<dim>;
     friend class Patch<dim>;
 public:
     Model(py::dict agent_modelObjs,py::object patch_model, settings_t settings);
@@ -47,7 +41,7 @@ public:
     void setup_patches();
     shared_ptr<Patch<dim>>& find_an_empty_patch();
     shared_ptr<Patch<dim>> find_an_empty_patch(shared_ptr<Patch<dim>>& refPatch);
-    vector<shared_ptr<Cell<dim>>> agents_container; //!< Bank of Cell.
+    vector<shared_ptr<Agent<dim>>> agents_container; //!< Bank of Agent.
     vector<shared_ptr<Patch<dim>>> patches_container;
     vector<shared_ptr<Mesh<dim>>> meshes_container;
 
@@ -56,11 +50,7 @@ protected:
     void _update();
     void update_agents();
     void update_patches();
-    void _passaging(); 
     unsigned iCount;            //!< Iteration index of the simulation incremented in #run.
-    unsigned end_passaging_n;   //!< Count of passaging occured in the model
-    unsigned start_passaging_n;
-    unsigned passaging_count;
     unsigned duration_ticks;    //!< experiment duration
     
     domain_measurements_scheme_t measurements_scheme; //! the scheme for obtaining #data
@@ -98,36 +88,7 @@ inline Model<dim>::Model(py::dict agent_modelObjs, py::object patch_model_,setti
 template<unsigned dim>
 inline bool Model<dim>::setup(){
     tools::create_directory(main_output_folder);
-     auto CHECK_PARAMS = [&](){
-        // auto pIter = inputs::params()["passaging_n"];
-        // if (pIter > inputs::params()["end_passaging_n"]){
-        //     cerr<<"end_passaging_n cannot be lower than 1"<<endl;
-        //     std::terminate();
-        // }
-    };
-    CHECK_PARAMS();
-    // auto PRE_CALCULATIONS = [&](){ // calculates ABM parameters bsed on the given inputs
-    //     float patch_size = configs["patch"]["patch_size"];
-    //     float confluence = configs["agent"]["initial_confluence"];
-    //     vector<int> cell_count_list = configs["agent"]["agents_initial_n"];
-    //     int cell_count = cell_count_list[0] ; // TODO:: sum up the list
-
-    //     float scale_factor = inputs::params()["scale_factor"];
-
-    //     auto down_scaled_cell_count = cell_count * scale_factor;
-    //     auto A = down_scaled_cell_count * patch_size * patch_size / confluence;
-    //     auto domain_x_l = pow(A,0.5);
-    //     // cout<<" down_scaled_cell_count: "<<down_scaled_cell_count<<" A:"<<A<<" domain_x_l:"<<domain_x_l<<endl;
-    //     inputs::params().insert(pair<string,float>("domain_x_l",domain_x_l));
-    //     // cout<<inputs::params()["initial_cellCount"]<<" "<<inputs::params()["domain_x_l"]<<endl;
-    //     // exit(2);
-    // };
-    // PRE_CALCULATIONS();
     auto INITIALIZE_VARIABLES = [&](){
-        // this->start_passaging_n = 1;
-        // this->passaging_count = 1;
-        // if (settings["configs"]["end_passaging_n"] != nullptr) this->end_passaging_n = settings["configs"]["end_passaging_n"];
-        // else this->end_passaging_n = this->start_passaging_n;
         this->duration_ticks = py::cast<unsigned>(settings["configs"]["exp_duration"]);
 
         auto PROCESS_DOMAIN_MEASUREMENTS_SCHEME = [&](){
@@ -152,7 +113,7 @@ inline bool Model<dim>::setup(){
     INITIALIZE_VARIABLES();
     Patch<dim>::_modelPtr() = this->shared_from_this();
     setup_patches();
-    Cell<dim>::_mPtr() = this->shared_from_this();
+    Agent<dim>::_mPtr() = this->shared_from_this();
     setup_agents();
     this->append_flag = true;
     this->_update();
@@ -170,10 +131,10 @@ inline void Model<dim>::setup_agents(){
         for(int iter=0; iter<agent_count; iter++) {
             try{
                 auto host_patch = find_an_empty_patch();
-                auto agent = Cell<dim>::hatch_a_cell(host_patch,agent_name);
+                auto agent = Agent<dim>::hatch_a_cell(host_patch,agent_name);
                 agents_container.push_back(agent);
-            }catch(no_available_patch&nap){
-                cerr<<"Error:: no available patch for agents during setup"<<endl;
+            }catch(tools::no_available_patch&nap){
+                nap.what();
                 std::terminate();
             }
         }
@@ -183,30 +144,19 @@ inline void Model<dim>::setup_agents(){
     LOG(message);
 }
 
-
-
-
 template<unsigned dim>
 inline py::dict Model<dim>::run(){
     auto EXECUTE = [&](){
         this->append_flag = true;
         visualize();
-        // cout<<"visualized"<<endl;
-        
-        
         for (auto &patch:patches_container) {
             patch->function();
         }
-        // cout<<"patch runned"<<endl;
         for (auto &agent:agents_container) {
                 agent->function();
         };
-        
-        // cout<<"cell runned"<<endl;
         update_agents();
-        // cout<<"cell updated"<<endl;
         update_patches();
-        // cout<<"patch updated"<<endl;
         _update();
     };
     auto TIME_CONTROL = [&](){
@@ -248,10 +198,9 @@ inline py::dict Model<dim>::run(){
         std::cout<<endl;
 
     };
-    _clock::start();
+    tools::_clock::start();
     TIME_CONTROL();
-    
-    // returns
+
     py::dict returns;
     for (auto &key_:settings["returns"].attr("keys")()){
         string key = py::cast<string>(key_);
@@ -261,66 +210,14 @@ inline py::dict Model<dim>::run(){
             py::dict returns1 = py::cast(sliced_data);
             returns[key_] = returns1;
         }
-//        cout<<key<<endl;
     };
     
-    _clock::end();
+    tools::_clock::end();
     cout<<"Run completed"<<endl;
     return returns;
 }
 
 
-template <unsigned dim>
-inline void Model<dim>::_passaging() {
-    // auto REDISTRIBUTE_LIVE_CELLS = [&](){
-    //     /** delete patches' cell occupancy **/
-    //     for (auto &patch:Patch<dim>::container()) patch->removeCell();
-    //     /** pick MSC_initial number among the entire cells **/
-    //     vector<shared_ptr<Cell<dim>>> cell_tem_container;
-    //     for (int cIter=0; cIter < inputs::params()["initial_cellCount"]; cIter++){
-    //         auto total_cell_number = Cell<dim>::container().size();
-    //         auto lucky_cell_index = tools::create_random_value(0,total_cell_number);
-    //         auto lucky_cell =Cell<dim>::container()[lucky_cell_index];
-    //         cell_tem_container.push_back(lucky_cell);
-    //         Cell<dim>::container().erase(Cell<dim>::container().begin() + lucky_cell_index); //!< Delete the chosen cell to not choose it again
-    //     }
-    //     Cell<dim>::container() = cell_tem_container;
-    //     /** distribute cells on the patches **/
-    //     for (auto &cell:Cell<dim>::container()){
-    //         shared_ptr<Patch<dim>> host_patch;
-    //         try{
-    //             host_patch = _find_an_empty_patch();
-    //         }catch(no_available_patch& nap){
-    //             throw nap;
-    //         }
-    //         host_patch->setCell(cell);   // cross-association
-    //         cell->setPatch(host_patch);
-    //     }
-    //     /** renew all cell activities  **/
-    //     for (auto &cell:Cell<dim>::container()) {
-    //         cell->cell_activities->reset_all();
-    //     }
-
-    // };
-    // REDISTRIBUTE_LIVE_CELLS();
-    // auto REFRESH_MODEL = [&](){
-    //     /** refresh the medium and results **/
-    //     // _results->output_results(_eCount);
-    //     // _results = make_shared<Result>();
-    //     // _results->initialize();
-    //     // append_flag = false;
-    //     // iCount = 0; //start from the begining
-    //     // _results->reset();
-    //     // append_flag = true;
-    //     // this->_medium_change();
-    //     // this->_update();
-    // };
-    // REFRESH_MODEL();
-    // auto message = "Passaging # "+ to_string(passaging_count)+ " finished";
-    // LOG(message);
-    // passaging_count++;
-
-}
 
 
 template<unsigned dim>
@@ -538,14 +435,14 @@ inline void Model<dim>::update_agents() {
             // cout<<"switching"<<endl;
             shared_ptr<Patch<dim>> host_patch = cell->getPatch();
             string new_type = cell->switch_info.second;
-            host_patch->removeCell();
-            auto new_cell = Cell<dim>::hatch_a_cell(host_patch,new_type);
+            host_patch->removeAgent();
+            auto new_cell = Agent<dim>::hatch_a_cell(host_patch,new_type);
             auto pos = distance(agents_container.begin(), find(agents_container.begin(), agents_container.end(), cell));
             agents_container[pos] = new_cell;
         }
     }
 
-    /* in case of disappear, Cell<dim>::agents_container needs to be updated */
+    /* in case of disappear, Agent<dim>::agents_container needs to be updated */
 
     int jj = 0;
     while (true) {
@@ -564,14 +461,14 @@ inline void Model<dim>::update_agents() {
         auto cell = agents_container[iter];
         if (cell->hatch_flag == true) {
             // cout<<"hatching"<<endl;
-            shared_ptr<Cell<dim>> new_agent;
+            shared_ptr<Agent<dim>> new_agent;
             try {
                 shared_ptr<Patch<dim>> ref_patch = cell->getPatch();
                 shared_ptr<Patch<dim>> host_patch = find_an_empty_patch(ref_patch);
-                shared_ptr<Cell<dim>> ref_cell = cell->getPtr();
-                new_agent = Cell<dim>::hatch_a_cell(host_patch,ref_cell);
+                shared_ptr<Agent<dim>> ref_cell = cell->getPtr();
+                new_agent = Agent<dim>::hatch_a_cell(host_patch,ref_cell);
                 agents_container.push_back(new_agent);
-            } catch (no_available_patch & er) {
+            } catch (tools::no_available_patch & er) {
                 // cerr<<"Warning: hatch cannot occur due to high agent density"<<endl;
                 continue;
             }
@@ -592,12 +489,12 @@ inline void Model<dim>::update_agents() {
         shared_ptr<Patch<dim>> destination;
         shared_ptr<Patch<dim>> ref_patch = cell->getPatch();
         try {destination = find_an_empty_patch(ref_patch);}
-        catch (no_available_patch & err) {
+        catch (tools::no_available_patch & err) {
             continue;
         }
         auto current_patch = cell->getPatch();
-        current_patch->removeCell();
-        destination->setCell(cell);
+        current_patch->removeAgent();
+        destination->setAgent(cell);
         cell->setPatch(destination);
     }
 
@@ -726,13 +623,13 @@ inline shared_ptr<Patch<dim>>& Model<dim>::find_an_empty_patch(){
     int randIndex;
     for(int iter=0; iter<patches_container.size(); iter++){
         randIndex =rand() %patches_container.size();
-        if (patches_container[randIndex]->hasCell()) {
+        if (patches_container[randIndex]->hasAgent()) {
             continue;
         }
         else return patches_container[randIndex];
 
     }
-    throw no_available_patch(); //in case there is no empty patch available
+    throw tools::no_available_patch("There is no available patch for agent allocation"); //in case there is no empty patch available
 }
 template<unsigned dim>
 inline shared_ptr<Patch<dim>> Model<dim>::find_an_empty_patch(shared_ptr<Patch<dim>>& refPatch){
@@ -740,7 +637,7 @@ inline shared_ptr<Patch<dim>> Model<dim>::find_an_empty_patch(shared_ptr<Patch<d
     // refPatch.reset(); //pointer to refPatch is no longer needed
     vector<shared_ptr<Patch<dim>>> free_patch_container; //available neighbor patches will be stored here
     for (auto neighborPatch:neighborPatches){
-        if (!neighborPatch->hasCell()) free_patch_container.push_back(neighborPatch);
+        if (!neighborPatch->hasAgent()) free_patch_container.push_back(neighborPatch);
     }
 
     int freeNeighborsCount = free_patch_container.size();
@@ -749,7 +646,7 @@ inline shared_ptr<Patch<dim>> Model<dim>::find_an_empty_patch(shared_ptr<Patch<d
         auto freeAvailablePatch = free_patch_container[randn];
         return freeAvailablePatch;
     }
-    throw no_available_patch();
+    throw tools::no_available_patch("There is no available patch for agent allocation");
 }
 
 
@@ -759,11 +656,11 @@ inline void Model<dim>::update_patches(){
         for (auto &patch:patches_container){
             int cellCount=0;
             for (auto neighborPatch:patch->neighborPatches){
-                if (neighborPatch->_hasCell) {
+                if (neighborPatch->_hasAgent) {
                     cellCount ++;
                 }
             }
-            if (patch->_hasCell) {
+            if (patch->_hasAgent) {
                 cellCount ++;
             }
             patch->data["agent_density"] = float(cellCount)/(patch->neighborPatches.size()+1);
