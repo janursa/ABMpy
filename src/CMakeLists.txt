@@ -2,7 +2,7 @@
 # for testing
 set(HEADER_LIST "${CMAKE_SOURCE_DIR}/include/CA/agent.h"
 	"${CMAKE_SOURCE_DIR}/include/CA/mesh.h"
-	"${CMAKE_SOURCE_DIR}/include/CA/model.h"
+	"${CMAKE_SOURCE_DIR}/include/CA/frame.h"
 	"${CMAKE_SOURCE_DIR}/include/CA/patch.h"
 	"${CMAKE_SOURCE_DIR}/include/CA/settings.h"
 	"${CMAKE_SOURCE_DIR}/include/CA/toolbox.h")

@@ -1,6 +1,9 @@
 
 #ifndef ABM_MODEL_H
 #define ABM_MODEL_H
+
+
+
 #include "patch.h"
 #include "agent.h"
 #include <chrono>
@@ -14,20 +17,19 @@ class Agent;
 template <unsigned dim>
 class Patch;
 using namespace std;
-//!  Model class
+//!  Frame class
 /*!
   Takes care of generating mesh, creating patch, creating cells, etc. as well as executing them on an iterative manner.
 */
 template<unsigned dim>
-class Model:public enable_shared_from_this<Model<dim>>{
+class Frame:public enable_shared_from_this<Frame<dim>>{
     friend class Agent<dim>;
     friend class Patch<dim>;
 public:
-    Model(py::dict agent_modelObjs,py::object patch_model, settings_t settings);
-    ~Model(){};
+    Frame(py::dict agent_modelObjs,py::object patch_model, settings_t settings);
+    ~Frame(){};
     bool setup();        
     py::dict run();
-    void reset();
     void  visualize() ; //!< To log requrested outputs for visualization
     void visualize_agents(const unsigned &iCount,const settings_t &specs) ;
     void visualize_patches(const unsigned &iCount,const settings_t &specs);
@@ -56,17 +58,9 @@ protected:
     domain_measurements_scheme_t measurements_scheme; //! the scheme for obtaining #data
 
 };
+
 template<unsigned dim>
-void Model<dim>::reset(){
-    // agent_counts().clear();
-    // data().clear();
-    // patches_container.clear();
-    // Patch<dim>::configs().clear();
-    
-    
-}
-template<unsigned dim>
-inline Model<dim>::Model(py::dict agent_modelObjs, py::object patch_model_,settings_t settings_):
+inline Frame<dim>::Frame(py::dict agent_modelObjs, py::object patch_model_,settings_t settings_):
         iCount(0), settings(settings_)
 {     
     srand(time(0));
@@ -86,7 +80,7 @@ inline Model<dim>::Model(py::dict agent_modelObjs, py::object patch_model_,setti
 }
 
 template<unsigned dim>
-inline bool Model<dim>::setup(){
+inline bool Frame<dim>::setup(){
     tools::create_directory(main_output_folder);
     auto INITIALIZE_VARIABLES = [&](){
         this->duration_ticks = py::cast<unsigned>(settings["configs"]["exp_duration"]);
@@ -121,7 +115,7 @@ inline bool Model<dim>::setup(){
 }
 
 template<unsigned dim>
-inline void Model<dim>::setup_agents(){
+inline void Frame<dim>::setup_agents(){
     // create the agents
     for (auto key:settings["configs"]["agents"].attr("keys")()){
         unsigned agent_count = py::cast<unsigned>(settings["configs"]["agents"][key]["initial_n"]);
@@ -145,7 +139,7 @@ inline void Model<dim>::setup_agents(){
 }
 
 template<unsigned dim>
-inline py::dict Model<dim>::run(){
+inline py::dict Frame<dim>::run(){
     auto EXECUTE = [&](){
         this->append_flag = true;
         visualize();
@@ -221,7 +215,7 @@ inline py::dict Model<dim>::run(){
 
 
 template<unsigned dim>
-inline void Model<dim>::_update(){
+inline void Frame<dim>::_update(){
     auto UPDATE_AGENT_COUNT = [&](){
         map<string,unsigned> agent_counts_single;
         for (unsigned i = 0; i < agents_container.size(); i++) {
@@ -303,7 +297,7 @@ inline void Model<dim>::_update(){
 
 
 template<unsigned dim>
-inline void Model<dim>::visualize()  {
+inline void Frame<dim>::visualize()  {
     bool logs_flag = py::cast<bool>(settings["logs"]["flag"]);
     if (!logs_flag) return; // no visualization
     // /***  cell distriburion visualization ***/
@@ -314,7 +308,7 @@ inline void Model<dim>::visualize()  {
 }
 
 template<unsigned dim>
-inline void  Model<dim>::visualize_agents(const unsigned &iCount,const settings_t &specs){
+inline void  Frame<dim>::visualize_agents(const unsigned &iCount,const settings_t &specs){
 
     auto SCATTER_LOG = [&](auto &item){
         vector<string> tags = py::cast<vector<string>>(item["tags"]);
@@ -427,7 +421,7 @@ inline void  Model<dim>::visualize_agents(const unsigned &iCount,const settings_
 }
 
 template<unsigned dim>
-inline void Model<dim>::update_agents() {
+inline void Frame<dim>::update_agents() {
     /*** Update age-related members ***/
 
     for (auto &cell:agents_container){
@@ -501,7 +495,7 @@ inline void Model<dim>::update_agents() {
 
 }
 template <unsigned dim>
-inline void Model<dim>::setup_patches(){
+inline void Frame<dim>::setup_patches(){
     float x_l = py::cast<float>(settings["configs"]["domain"]["x_l"]);
     float y_l = py::cast<float>(settings["configs"]["domain"]["y_l"]); 
     Mesh<dim>::_modelPtr() = this->shared_from_this();
@@ -532,7 +526,7 @@ inline void Model<dim>::setup_patches(){
 }
 
 template<unsigned dim>
-inline void Model<dim>::visualize_patches(const unsigned &iCount,const settings_t &specs){
+inline void Frame<dim>::visualize_patches(const unsigned &iCount,const settings_t &specs){
     auto DENSITYMAP_LOG = [&](auto &item){
         string dir = py::cast<string>(item["dir"]);
         ofstream O(dir);
@@ -619,7 +613,7 @@ inline void Model<dim>::visualize_patches(const unsigned &iCount,const settings_
 }
 
 template<unsigned dim>
-inline shared_ptr<Patch<dim>>& Model<dim>::find_an_empty_patch(){
+inline shared_ptr<Patch<dim>>& Frame<dim>::find_an_empty_patch(){
     int randIndex;
     for(int iter=0; iter<patches_container.size(); iter++){
         randIndex =rand() %patches_container.size();
@@ -632,7 +626,7 @@ inline shared_ptr<Patch<dim>>& Model<dim>::find_an_empty_patch(){
     throw tools::no_available_patch("There is no available patch for agent allocation"); //in case there is no empty patch available
 }
 template<unsigned dim>
-inline shared_ptr<Patch<dim>> Model<dim>::find_an_empty_patch(shared_ptr<Patch<dim>>& refPatch){
+inline shared_ptr<Patch<dim>> Frame<dim>::find_an_empty_patch(shared_ptr<Patch<dim>>& refPatch){
     auto neighborPatches = refPatch->neighborPatches;
     // refPatch.reset(); //pointer to refPatch is no longer needed
     vector<shared_ptr<Patch<dim>>> free_patch_container; //available neighbor patches will be stored here
@@ -651,7 +645,7 @@ inline shared_ptr<Patch<dim>> Model<dim>::find_an_empty_patch(shared_ptr<Patch<d
 
 
 template<unsigned dim>
-inline void Model<dim>::update_patches(){
+inline void Frame<dim>::update_patches(){
     auto CALCULATE_AGENTDENSITY = [&](){
         for (auto &patch:patches_container){
             int cellCount=0;

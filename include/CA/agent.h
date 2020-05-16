@@ -1,12 +1,9 @@
-//
-// Created by nourisaj on 5/23/19.
-//
 
 #ifndef DIFFUSION_CELL_H
 #define DIFFUSION_CELL_H
 #include <iostream>
 #include "patch.h"
-#include "model.h"
+#include "frame.h"
 #include "toolbox.h"
 #include "settings.h"
 template <unsigned dim>
@@ -14,21 +11,19 @@ class Agent;
 template <unsigned dim>
 class Patch;
 template <unsigned dim>
-class Model;
+class Frame;
 
-//!  Main class for defining cell as an agent.
+//!  Defines agents.
 /*!
+    The main class to construct agents and store agent's data.
 */
 template<unsigned dim>
 class Agent:public enable_shared_from_this<Agent<dim>>{
 public:
-    Agent(string);                                       //!< Agent constructor
-    explicit Agent(std::shared_ptr<Agent<dim>> &cellPtr); //!< Agent constructor based on a given cell. This is used in proliferation. #_attr is transferred to the child cell.
-    virtual ~Agent();
-    // static void setup_cells(weak_ptr<Model<dim>> mPtr,settings_t configs_);
-    
-    static shared_ptr<Model<dim>> getModelPointer();    //!< Returns _mPtr                                                          //!< creates a cell based on the given type and locate its randomly in the domain
-
+    Agent(string);                                        
+    explicit Agent(std::shared_ptr<Agent<dim>> &cellPtr); //!< Agent constructor based on agent type
+    virtual ~Agent();                                     //!< Agent constructor based on a reference agent. 
+    static shared_ptr<Frame<dim>> getFramePointer();      //!< Returns pointer to Frame (Agent::_mPtr)                                                          
     static shared_ptr<Agent<dim>> hatch_a_cell(shared_ptr<Patch<dim>>& host_patch, std::shared_ptr<Agent<dim>> & ref_cell);
     static shared_ptr<Agent<dim>> hatch_a_cell(shared_ptr<Patch<dim>>& host_patch, string cell_type);
 
@@ -51,16 +46,16 @@ public:
 
     
     settings_t configs(){
-        return getModelPointer()->settings["configs"];
+        return getFramePointer()->settings["configs"];
         
     };
-    static weak_ptr<Model<dim>>& _mPtr(){     //!< Weak pointer to the model
-        static weak_ptr<Model<dim>> var{};
+    static weak_ptr<Frame<dim>>& _mPtr(){     //!< Weak pointer to the model
+        static weak_ptr<Frame<dim>> var{};
         return var;
     };
     
     py::object get_agent_model(string &type){
-        return getModelPointer()->agent_models[type];
+        return getFramePointer()->agent_models[type];
     }
 protected:
     weak_ptr<Patch<dim>> _patchPtr;                    //!< weak pointer to the patch the cell resides in
@@ -151,8 +146,8 @@ inline shared_ptr<Patch<dim>> Agent<dim>::getPatch(){
 
 
 template <unsigned dim>
-inline shared_ptr<Model<dim>> Agent<dim>::getModelPointer(){
-    return shared_ptr<Model<dim>>(Agent<dim>::_mPtr());
+inline shared_ptr<Frame<dim>> Agent<dim>::getFramePointer(){
+    return shared_ptr<Frame<dim>>(Agent<dim>::_mPtr());
 }
 
 template<unsigned dim>

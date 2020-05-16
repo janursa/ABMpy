@@ -1,41 +1,24 @@
-
-/* Copyright (C) 2019 Jalil Nourisa - All Rights Reserved
- * You may use, distribute and modify this code under the
- * terms of the XYZ license, which unfortunately won't be
- * written for another century.
- *
- * You should have received a copy of the XYZ license with
- * this file. If not, please write to: , or visit :
- */
-/* Copyright (C) 2019 Jalil Nourisa - All Rights Reserved
- * You may use, distribute and modify this code under the
- * terms of the XYZ license, which unfortunately won't be
- * written for another century.
- *
- * You should have received a copy of the XYZ license with
- * this file. If not, please write to: , or visit :
- */
-// #include <pybind11/pybind11.h>
-#include <iostream>
-#include <CA/model.h>
-using std::cout;
-struct CA{
-    CA() {}
-    explicit CA(py::dict agent_modelObjs,py::object patch_model,settings_t settings) {
-        model = make_shared<Model<DIM>> (agent_modelObjs,patch_model,settings);
+#include <CA/frame.h>
+//!  A pybind interface to Frame
+/*!
+  Provides a pybind interface to Frame. It receives agent models, patch model, and settings and passes to Frame::Frame to construct a model. 
+*/
+struct ABM{
+    explicit ABM(py::dict agent_modelObjs,py::object patch_model,settings_t settings) {
+        model = make_shared<Frame<DIM>> (agent_modelObjs,patch_model,settings);
     }
-    std::shared_ptr<Model<DIM>> model;
-    py::dict run() {
+    std::shared_ptr<Frame<DIM>> model; //!< A pointer to Frame. It's create in ABM::ABM and used in ABM::run.
+    py::dict run() { //! Calls Frame::setup to setup ABM and then Frame::run to run the model. It receives the results as a py::dict and returns.
+
         model->setup();
         py::dict returns = model->run();
-        model->reset();
         return returns;
     }
 };
 
-PYBIND11_MODULE(CA, m) {
-    py::class_<CA>(m, "CA")
+PYBIND11_MODULE(ABM, m) {
+    py::class_<ABM>(m, "ABM")
             .def(py::init<py::dict,py::object,settings_t>()) //receives NN as input
-            .def("run", &CA::run);
+            .def("run", &ABM::run);
 };
 

@@ -3,12 +3,12 @@
 #include <map>
 #include <string>
 #include "toolbox.h"
-#include "model.h"
+#include "frame.h"
 
 
 using namespace std;
 template <unsigned dim>
-class Model;
+class Frame;
 template <unsigned dim>
 class Agent;
 //!  Patch class
@@ -26,7 +26,7 @@ public:
 
 
 
-    static std::shared_ptr<Model<dim>> get_modelPtr();              //!< Returns #_modelPtr
+    static std::shared_ptr<Frame<dim>> get_modelPtr();              //!< Returns #_modelPtr
      settings_t configs(){
         return get_modelPtr()->settings["configs"];
      };
@@ -48,7 +48,7 @@ public:
     py::object get_patch_model(){
         return get_modelPtr()->patch_model;
     }
-    static weak_ptr<Model<dim>>& _modelPtr(){static  weak_ptr<Model<dim>> var{}; return var;};
+    static weak_ptr<Frame<dim>>& _modelPtr(){static  weak_ptr<Frame<dim>> var{}; return var;};
     bool _hasAgent;
 private:
     weak_ptr<Agent<dim>> _cellPtr;
@@ -101,8 +101,8 @@ inline shared_ptr<Agent<dim>> Patch<dim>::getAgent(){
 }
 
 template<unsigned dim>
-inline std::shared_ptr<Model<dim>> Patch<dim>::get_modelPtr(){
-    shared_ptr<Model<dim>> p = _modelPtr().lock();
+inline std::shared_ptr<Frame<dim>> Patch<dim>::get_modelPtr(){
+    shared_ptr<Frame<dim>> p = _modelPtr().lock();
     if (!p){
         throw logic_error("Weak_ptr (_modelPtr inside patch) expired)");
     }

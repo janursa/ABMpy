@@ -1,14 +1,11 @@
-//
-// Created by nourisaj on 7/17/19.
-//
 
 #pragma once
-#include "model.h"
+#include "frame.h"
 
 using namespace std;
 
 template <unsigned dim>
-class Model;
+class Frame;
 //!  This class is the mesh class
 /*!
   A more elaborate class description.
@@ -30,9 +27,9 @@ public:
     std::vector<unsigned> neighbor_indices; //!< Indices of meshes located in the neumann boundary
     float x_coord;
     float y_coord;
-    static weak_ptr<Model<dim>>& _modelPtr(){static  weak_ptr<Model<dim>> var{}; return var;};
-    static std::shared_ptr<Model<dim>> get_modelPtr(){
-        shared_ptr<Model<dim>> p = _modelPtr().lock();
+    static weak_ptr<Frame<dim>>& _modelPtr(){static  weak_ptr<Frame<dim>> var{}; return var;};
+    static std::shared_ptr<Frame<dim>> get_modelPtr(){
+        shared_ptr<Frame<dim>> p = _modelPtr().lock();
         if (!p){
             throw logic_error("Weak_ptr (_modelPtr inside mesh) expired)");
         }
