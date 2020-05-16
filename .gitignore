@@ -1,6 +1,5 @@
 extern/*
 build/*
-docs/*
 xcode/*
 cmake-build-debug/*
 CMakeFiles/*
