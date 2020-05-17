@@ -1,16 +1,13 @@
 
 #ifndef ABM_MODEL_H
 #define ABM_MODEL_H
-
-
-
-#include "patch.h"
-#include "agent.h"
 #include <chrono>
 #include <thread>
+#include <pybind11/stl.h>
+#include "patch.h"
+#include "agent.h"
 #include "settings.h"
 #include "mesh.h"
-#include <pybind11/stl.h>
 namespace py = pybind11;
 template <unsigned dim>
 class Agent;

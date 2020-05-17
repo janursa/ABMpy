@@ -41,9 +41,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(pybind11)
 set(PYBIND11_CPP_STANDARD -std=c++17)
 
-if((CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME OR MODERN_CMAKE_BUILD_TESTING) AND MODULE)
-    add_subdirectory(src)
-endif()
+add_subdirectory(src)
 
 
 if((CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME OR MODERN_CMAKE_BUILD_TESTING) AND TESTING)

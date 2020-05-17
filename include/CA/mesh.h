@@ -6,9 +6,9 @@ using namespace std;
 
 template <unsigned dim>
 class Frame;
-//!  This class is the mesh class
+//!  To generate meshes
 /*!
-  A more elaborate class description.
+  So far, it only generates square meshes on a square domain. 
 */
 template<unsigned dim>
 class Mesh{

@@ -14,10 +14,6 @@ class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
         Extension.__init__(self, name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
-        print(self.get_ext_fullpath(ext.name))
-        print("\n")
-
-
 
 class CMakeBuild(build_ext):
     def run(self):
@@ -40,12 +36,6 @@ class CMakeBuild(build_ext):
     def build_extension(self, ext):
         extdir = os.path.abspath(
             os.path.dirname(self.get_ext_fullpath(ext.name)))
-        print(self.get_ext_fullpath(ext.name))
-        print("\n")
-        print(os.path.dirname(self.get_ext_fullpath(ext.name)))
-        print("\n")
-        print(extdir)
-        sys.exit()
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY='+ extdir,
                       '-DPYTHON_EXECUTABLE=' + sys.executable]
 
@@ -75,18 +65,21 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', '--build', '.'] + build_args,
                               cwd=self.build_temp)
         print()  # Add an empty line for cleaner output
-
+def extract_longDiscription(file_name):
+    with open(file_name, "r") as fh:
+        long_description = fh.read()
+    return long_description
 setup(
-    name='CA',
-    version='0.0',
+    name='ABMpy',
+    version='2.0.1',
     author='Jalil Nourisa',
     author_email='jalil.nourisa@gmail.com',
-    description='Cellular automata',
-    long_description='',
-    install_requires=["docutils>=0.3"],
-    download_url="https://github.com/janursa/CA",
+    description='Agent-based modeling framework',
+    long_description=extract_longDiscription("README.md"),
+    install_requires=[],
+    download_url="https://github.com/janursa/ABM",
     # add extension module
-    ext_modules=[CMakeExtension('CA',"src/")],
+    ext_modules=[CMakeExtension('ABM')],
     # add custom build_ext command
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,

@@ -4,8 +4,6 @@
 #include <string>
 #include "toolbox.h"
 #include "frame.h"
-
-
 using namespace std;
 template <unsigned dim>
 class Frame;
@@ -13,7 +11,7 @@ template <unsigned dim>
 class Agent;
 //!  Patch class
 /*!
-  A more elaborate class description.
+  Keeps record of patch attributes and data.
 */
 template<unsigned dim>
 class Patch:public enable_shared_from_this<Patch<dim>> {
