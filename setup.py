@@ -66,7 +66,10 @@ class CMakeBuild(build_ext):
                               cwd=self.build_temp)
         print()  # Add an empty line for cleaner output
 def extract_longDiscription(file_name):
-    with open(file_name, "r") as fh:
+    import pathlib
+    current_file_path = pathlib.Path(__file__).parent.absolute()
+    file_dir = os.path.join(current_file_path,file_name)
+    with open(file_dir, "r") as fh:
         long_description = fh.read()
     return long_description
 setup(
