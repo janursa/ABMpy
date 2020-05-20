@@ -3,6 +3,7 @@ The package is designed to provide a generic framework for ABM development in Py
 ## Getting started
 ### Quick start
 `pip install --upgrade ABMpy`
+
 Define the algorithm that maps inputs to outputs for an agent:
 ```py
 class agent1_model:
