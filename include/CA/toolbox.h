@@ -36,7 +36,8 @@ namespace tools{
         }
         void static end(){
             _clock::_end() = std::chrono::steady_clock::now();
-            std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::seconds>(_end() - _begin()).count() << "[s]" << std::endl;
+            string message = "Time difference = " + to_string(std::chrono::duration_cast<std::chrono::seconds>(_end() - _begin()).count()) + "[s]\n" ;
+            LOG(message);
         }
         static std::chrono::steady_clock::time_point& _begin(){
             static std::chrono::steady_clock::time_point var{};

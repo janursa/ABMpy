@@ -173,20 +173,21 @@ inline py::dict Frame<dim>::run(){
         iCount = 1;
         while (iCount < duration_ticks) {
             int barWidth = 70;
-            std::cout << "[";
+            LOG("[");
             int pos = barWidth * (float)iCount/duration_ticks;
             for (int i = 0; i < barWidth; ++i) {
-                if (i < pos) std::cout << "=";
-                else if (i == pos) std::cout << ">";
-                else std::cout << " ";
+                if (i < pos) LOG("=");
+                else if (i == pos) LOG(">");
+                else LOG(" ");
             }
-            std::cout << "] " << iCount << " Iterations\r";
+            string message = "] " + to_string(iCount) + " Iterations\r";
+            LOG(message);
             std::cout.flush();
 
             EXECUTE();
             iCount++;
         }
-        std::cout<<endl;
+        LOG("\n");
 
     };
     tools::_clock::start();
@@ -204,7 +205,7 @@ inline py::dict Frame<dim>::run(){
     };
     
     tools::_clock::end();
-    cout<<"Run completed"<<endl;
+    LOG("Run completed");
     return returns;
 }
 

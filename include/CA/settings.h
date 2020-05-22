@@ -7,13 +7,13 @@
 namespace py = pybind11;
 
 
-#define DEBUG
+//#define DEBUG
 
 
 // *** constants ***// 
 const unsigned DIM = 2; 
 #ifdef DEBUG
-#define LOG(str) do { std::cout << str << std::endl; } while( false )
+#define LOG(str) do { std::cout << str ; } while( false )
 #else
 #define LOG(str) do { } while ( false )
 #endif
